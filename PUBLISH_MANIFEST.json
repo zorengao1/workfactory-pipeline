@@ -266,5 +266,17 @@
   {
     "path": "docs/API_AND_PIPELINE.txt",
     "sha256": "dc6b0499345e0a53a715b777ff8634e52593b0588f241205751e4e8f5c67f8b4"
+  },
+  {
+    "path": "README.md",
+    "sha256": "0063cd77414b8bf8b59c3322c18e0f2bea479768739b953471ddae27819f165b"
+  },
+  {
+    "path": "service.py",
+    "sha256": "af49fcb2a7a826a8a5f63ab26e07870cd18f564c3197d3f24371981ed5fe4e8f"
+  },
+  {
+    "path": "tests/test_service.py",
+    "sha256": "96d19ee7a013b3582119b26e7a87d688601bc2cab7e46a713986411f70a5319b"
   }
 ]
