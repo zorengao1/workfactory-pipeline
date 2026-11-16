@@ -40,6 +40,7 @@ class PipelineV2Tests(unittest.TestCase):
                 runtime.execute('ls /task');runtime.close()
             command=run.call_args_list[0].args[0]
             self.assertIn('none',command)
+            self.assertIn('--user',command)
             mounts=[command[i+1] for i,v in enumerate(command) if v=='--mount']
             self.assertEqual(len(mounts),2)
             self.assertTrue(mounts[0].endswith('dst=/task,readonly'))

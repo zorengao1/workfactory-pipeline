@@ -1,5 +1,6 @@
 """Independent, disposable stage container; model credentials never enter it."""
 import json
+import os
 import subprocess
 import uuid
 from pathlib import Path
@@ -16,6 +17,7 @@ class DockerRuntime:
         if self.started:return
         command=['docker','run','-d','--name',self.name,'--label','pipeline=workfactory',
                  '--network','none','--cap-drop','ALL','--security-opt','no-new-privileges',
+                 '--user',f'{os.getuid()}:{os.getgid()}','--env','HOME=/tmp',
                  '--pids-limit','256','--memory',self.settings.get('memory','2g'),
                  '--cpus',str(self.settings.get('cpus',1)),
                  '--mount',f'type=bind,src={self.root},dst=/task,readonly']

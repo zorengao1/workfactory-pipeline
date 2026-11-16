@@ -29,7 +29,7 @@
   },
   {
     "path": "docker_runtime.py",
-    "sha256": "34a5dac82738ae9da42df84e5d5d232492a8a184bd88e1b2c42bccbf36abd580"
+    "sha256": "be6a167406be1a85b5663f41a95ee1ffd9f75f8848fc3304da7d4b5e70fd5c43"
   },
   {
     "path": "review_regression.py",
@@ -229,7 +229,7 @@
   },
   {
     "path": "tests/test_pipeline_v2.py",
-    "sha256": "e29a9e9a1ed26146a4533056bbccc318050594c85038d63007eabb29860f1a81"
+    "sha256": "2b2d0d0569223bb5c833102d8b2f178f767cf722cc76150fb748e6e8af6afd2b"
   },
   {
     "path": "tests/test_stream.py",
