@@ -5,7 +5,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-MODELS=('deepseek-v4.1-flash-1017','mimo-v2.6-flash')
+MODELS=('deepseek-v4.1-flash-1017','mimo-v2.6-flash','gpt-6.1-sol')
 
 
 def main():
@@ -13,7 +13,7 @@ def main():
     parser.add_argument('--config',required=True,help='External credential env file')
     parser.add_argument('--pipeline-config',required=True)
     parser.add_argument('--output',required=True)
-    parser.add_argument('--models',nargs='+',choices=MODELS,default=list(MODELS))
+    parser.add_argument('--models',nargs='+',choices=MODELS,default=list(MODELS[:2]))
     args=parser.parse_args()
     root=Path(args.output).resolve();root.mkdir(parents=True,exist_ok=True)
     def run(model):

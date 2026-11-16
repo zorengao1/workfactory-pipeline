@@ -1,0 +1,61 @@
+{
+  "model": "deepseek-v4.1-flash-1017",
+  "scope": "Actual source documents to intent generation and review; not full environment runs",
+  "cases": [
+    {
+      "task_id": "onet-23-1023-00",
+      "route": "01a_occupation",
+      "verdict": "pass",
+      "objective": "在查明争议事实与适用规则的基础上，形成一份可供各方和法院直接执行的书面的证据开示裁定与配套案件管理令：逐项判定被请求材料是否属于开示范围（含相关性与比例性检验）、逐项处理特权与工作成果异议，并同步确定后续开示、证据交换与会议的日程和举证边界；裁定须列明法律依据、逐项理由与可操作的处理指令。",
+      "source_ids": [
+        "onet-31.0-23-1023.00",
+        "soc-2018-23-1023"
+      ],
+      "failed_checks": []
+    },
+    {
+      "task_id": "onet-25-1111-00",
+      "route": "01a_occupation",
+      "verdict": "pass",
+      "objective": "Create a review-ready, digitally executable module package that aligns lecture content, classroom discussion, readings, assignments, and grading and record-keeping rules with program outcomes and institutional policies, enabling the instructor or teaching team to deliver and assess the module in the upcoming term.",
+      "source_ids": [
+        "onet-31.0-25-1111.00",
+        "soc-2018-25-1111"
+      ],
+      "failed_checks": []
+    },
+    {
+      "task_id": "skill-source-0001",
+      "route": "01b_skill",
+      "verdict": "pass",
+      "objective": "Produce a coherent, evidence-preserving figure-to-accessibility package: static publication figure, accessible companion, verified caption/accessibility text, and provenance record, without altering data or inferring journal/UI requirements.",
+      "source_ids": [
+        "skills-sh-k-dense-ai__scientific-agent-skills__scientific-visualization",
+        "skills-sh-uizze__uizze__uizze-ui",
+        "skills-sh-k-dense-ai__scientific-agent-skills__scientific-writing"
+      ],
+      "failed_checks": []
+    },
+    {
+      "task_id": "skill-source-0002",
+      "route": "01b_skill",
+      "verdict": "fail",
+      "objective": "依据 Remotion 指南判断并搭建/复用项目与 composition，使用 Vercel React 最佳实践审查和优化组合中的 React 组件，最终交付可渲染工程、性能审查记录和变更摘要。",
+      "source_ids": [
+        "skills-sh-remotion-dev__skills__remotion-best-practices",
+        "skills-sh-remotion-dev__skills__remotion-create",
+        "skills-sh-vercel-labs__agent-skills__vercel-react-best-practices"
+      ],
+      "failed_checks": [
+        {
+          "criterion": "feasibility",
+          "reason": "核心标记规范依赖授权范围外且当前不可获取的内容，按外部检索关闭约束不可行。"
+        },
+        {
+          "criterion": "source_support",
+          "reason": "性能审查和逐条规则引用缺少来源中的具体规则支持，不能由现有材料直接支撑。"
+        }
+      ]
+    }
+  ]
+}

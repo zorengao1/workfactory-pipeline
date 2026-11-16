@@ -27,6 +27,7 @@ def checks(root, plan):
     formats=[]
     for item in plan['reference_files']:
         p=root/item['path'];fmt=item['format'].lower().lstrip('.')
+        fmt={'markdown':'md','text':'txt','jpeg':'jpg'}.get(fmt,fmt)
         valid=p.suffix.lower()=='.'+fmt and p.is_file()
         if valid and fmt in {'docx','xlsx','pptx'}:
             try:

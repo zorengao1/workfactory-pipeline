@@ -1,0 +1,19 @@
+{
+  "soc_url": "https://www.bls.gov/soc/2018/major_groups.htm",
+  "onet_version": "31.0",
+  "skills_catalogs": [
+    "https://www.skills.sh/",
+    "https://www.skills.sh/anthropics/knowledge-work-plugins",
+    "https://www.skills.sh/anthropics/financial-services",
+    "https://www.skills.sh/anthropics/claude-for-legal",
+    "https://www.skills.sh/anthropics/healthcare",
+    "https://www.skills.sh/anthropics/life-sciences",
+    "https://www.skills.sh/anthropics/k12-teacher-skills",
+    "https://www.skills.sh/k-dense-ai/scientific-agent-skills"
+  ],
+  "skills_limit": 96,
+  "skills_per_repository": 6,
+  "occupation_limit": 0,
+  "skill_case_count": 24,
+  "sampling_seed": 42
+}

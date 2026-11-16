@@ -10,7 +10,7 @@
   "required_deliverable_formats": [],
   "reference_file_count": null,
   "external_retrieval": false,
-  "source_cases": "config/cases.json",
+  "source_cases": "data/source_pools/cases.json",
   "stage_models": {},
   "runtime": {
     "node": "",

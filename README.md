@@ -1,149 +1,122 @@
 # WorkFactory Pipeline
 
-独立运行的专业任务合成与教师轨迹生成管线。
+专业任务环境与教师候选轨迹生成管线。
 
-## 当前可用范围
+## 流程
 
-- 意图合成 → 信息支撑图 → 文件规划 → 环境构建与检查 → 探针与修复 → 教师执行 → 候选轨迹导出
-- DeepSeek V4.1 Flash 1017 与 MiMo V2.6 Flash 分组运行，各组默认使用同一模型构造与求解
-- 文件格式和数量由规划器选择，支持 PDF、DOCX、PPTX、XLSX 与文本类文件
-- 任务并行和模型 API 并发分别配置，保存每个阶段的请求、响应、工具记录与失败尝试
-- macOS 后台入口由 launchd 托管，文件访问权限满足后可独立于聊天执行
+真实来源池 → 意图生成与审查 → 信息支撑图与文件规划 → 文件构建与审查 → 独立探针与修复 → 独立教师求解 → 候选轨迹导出。
 
-目前新版 Docker 端到端与高并发压测尚未通过。代码检查通过不代表十条新轨迹已经生成。
+模型、任务并发、API 并发、阶段模型和容器资源通过配置控制。文件数量和格式由工作需要决定。环境可包含 PDF、DOCX、PPTX、XLSX、CSV、JSON 等实际可处理的文件。
 
-## 仓库与执行环境
+## 原素材入口
 
-GitHub 保存管线源码、提示词、JSON 契约、配置模板、测试、README 和 docker/Dockerfile。Docker 镜像、容器、运行结果与密钥保存在运行机器上，不提交 GitHub。
+默认输入已改为 SOC、O*NET 和 skills.sh 来源生成的清单。config/cases.json 等手写情境仅保留为测试样例，不作为默认来源。
 
-开发机克隆仓库后，执行 docker build。Docker 根据 Dockerfile 的 FROM 从 Docker Hub 拉取 Python 基础镜像，再安装文档处理依赖，构建本机 WorkFactory 镜像。Dockerfile 从 GitHub 获取，基础镜像从 Docker Hub 获取。
+| 来源 | 用途 | 固定信息 |
+|---|---|---|
+| BLS 2018 SOC | 大类、细分职业、职责和层级 | 论文引用的 major_groups.htm |
+| O*NET | 细分角色、实际任务、技能与工作活动 | 31.0 版本 |
+| skills.sh | 技能文档正文及技能组合候选 | 固定本地抓取快照和哈希 |
+
+BLS 官方地址为 https://www.bls.gov/soc/2018/major_groups.htm 。本机普通脚本收到 HTTP 403，返回页面说明自动采集受到限制。正常浏览器能够访问同一地址，因此通过 Chrome 保存了官方 HTML。resources/soc-2018 保存该页面和来源哈希，属于可核验的原素材快照。后续开发机默认读取这份固定快照，不依赖聊天或浏览器会话，也不切换其他来源。
+
+需要更新 BLS 快照时，在浏览器打开同一官方地址并保存为仅 HTML，再显式导入。
+
+```bash
+python3 source_pools.py fetch-soc --import-html /absolute/path/major_groups.html
+```
+
+采集器只读取技能文档，不安装技能、不执行其中的指令和脚本。网页抓取内容保存在本地 data/，不会上传运行数据或密钥。
+
+## 开发机准备
+
+需要 Python 3.9 或更新版本、可用 Docker Engine 和模型接口。控制器与来源采集器使用 Python 标准库。Docker 中安装文档处理库和 LibreOffice，不依赖 Codex 或本机 Office。
 
 ```bash
 git clone https://github.com/zorengao1/workfactory-pipeline.git
 cd workfactory-pipeline
+python3 source_pools.py fetch-soc
+python3 source_pools.py fetch-onet
+python3 source_pools.py fetch-skills
+python3 source_pools.py build
 docker build -t workfactory/runtime:v2 docker
 python3 scripts/check_environment.py
-```
-
-多台开发机可以分别构建相同 Dockerfile。将来如需直接拉取预构建 WorkFactory 镜像，可单独发布到镜像仓库，并在 sandbox.image 指定版本。目前尚未发布该镜像。
-
-该组织方式参考 Terminal-Bench 的代码、任务配置与环境构建文件分离。当前仓库保留自己的任务契约与编排入口，未实现 Terminal-Bench 格式兼容。
-
-## 安装与准备
-
-需要 Python 3.10 或更新版本、Docker Desktop 和可调用的模型接口。后台入口需要 macOS 登录会话。
-
-```bash
-cp config/pipeline.json config/local.json
-mkdir -p "$HOME/.config/workfactory"
-cp config/credentials.env.example "$HOME/.config/workfactory/credentials.env"
-chmod 600 "$HOME/.config/workfactory/credentials.env"
-docker build -t workfactory/runtime:v2 docker
 python3 -m unittest discover -s tests -v
 ```
 
-在外部 credentials.env 中填写接口地址和密钥。配置模板中 runtime 路径用于固定文件工具，需要按本机安装填写。Docker 内的 execute_command 可以使用镜像自带的文档处理库。固定 XLSX 与 PPTX 工具还依赖本机 Artifact Tool，当前没有打包可移植安装流程，不可将本机路径复制到其他机器直接使用。
+config/source-pools.json 控制 O*NET 版本、技能目录、采集数量与抽样参数。下载文件保存 URL、获取时间和 SHA256，缓存改变会明确报错。职业候选按 SOC 大类轮流排列，技能候选先用 TF-IDF 找相关文档，再由模型检查实际输入输出关系。该抽样方式没有复刻论文的频率分布。
 
-不得提交密钥、config/local.json 或运行数据。缺失依赖会报错，不自动更换模型或执行环境。
+data/source_pools/statistics.json 给出原素材和候选输入规模。当前快照统计见 docs/SOURCE_POOL_STATISTICS.json。候选输入数量不等于已生成环境或已验收轨迹数量。
 
-## 后台启动与查看
-
-在代码目录运行以下命令。后台使用启动命令所对应的 Python，请使用已验证的解释器。
+build 默认每个 O*NET 职业产生一个候选输入，并创建 24 个技能组合候选。小批量验证可以显式减少数量。
 
 ```bash
-python3 service.py start \
-  --config "$HOME/.config/workfactory/credentials.env" \
-  --pipeline-config config/local.json \
-  --output runs/multiformat-v2
-python3 service.py status --output runs/multiformat-v2
-python3 batch_report.py runs/multiformat-v2
+python3 source_pools.py build --occupations 23 --skill-cases 4
 ```
 
-只运行一个模型时，在 start 命令中追加相应参数。
+每个职业不强制包含全部职责，只要求模型从来源支持的工作中选择一个可数字化执行的目标。业务情境和具体企业数据的合成须标注。
+
+## 密钥与运行
+
+密钥保存在仓库外部的 env 文件，模板为 config/credentials.env.example。不要提交密钥、本机配置或 runs/。默认模型入口支持 deepseek-v4.1-flash-1017、mimo-v2.6-flash、gpt-6.1-sol。
 
 ```bash
---models deepseek-v4.1-flash-1017
+cp config/pipeline.json config/local.json
+python3 batch_generate.py --config /absolute/path/credentials.env --pipeline-config config/local.json --output runs/batch-001 --model deepseek-v4.1-flash-1017
 ```
 
-后台日志保存在批次目录的 service.stdout.log、service.stderr.log 和各模型的 .log 文件。status 同时显示 launchd 的进程状态和管线状态文件。状态文件中的 running 必须结合进程状态与最新日志判断。
+两个模型批次可以同时启动，模型分别用于本组构造和教师求解。
 
 ```bash
-tail -f runs/multiformat-v2/deepseek-v4.1-flash-1017.log
-python3 service.py stop --output runs/multiformat-v2
+python3 run_models.py --config /absolute/path/credentials.env --pipeline-config config/local.json --output runs/batch-001 --models deepseek-v4.1-flash-1017 mimo-v2.6-flash
 ```
 
-关闭聊天和终端不停止后台任务。电脑睡眠会暂停计算，关机或退出系统登录会话会终止服务。本版本不自动开机启动，也不无限重启失败批次。
+config/local.json 的 task_workers 控制每组完整任务并发，api_max_concurrency 控制每个模型的在途请求数。每个容器默认限制 2 GB 内存、1 CPU。接口配额与容器资源必须分别验证，64 并发尚未压测。
 
-## 中断后恢复
+Linux 可以在已有的 tmux 或开发机作业调度器中运行上述命令。macOS 可使用 launchd 后台入口。
 
-修复接口或环境问题后，先执行 stop，再对同一输出目录执行原来的 start 命令。已经完成的候选任务会跳过，通过校验的阶段会复用。
+```bash
+python3 service.py start --config /absolute/path/credentials.env --pipeline-config config/local.json --output runs/batch-001 --models deepseek-v4.1-flash-1017
+python3 service.py status --output runs/batch-001
+python3 service.py stop --output runs/batch-001
+```
 
-请求已保存但响应尚未保存时，可以从请求中的对话恢复。响应已保存而工具执行状态不明时，管线会停止并要求检查原始记录，避免重复执行写入。当前不保证任意工具执行中断都可无人值守恢复。
+后台入口在关闭聊天或终端后仍可运行。睡眠、关机、退出系统登录会影响本地执行，不自动无限重启失败批次。Documents 下的后台脚本可能被 macOS 文件访问权限阻断，已验证的本地部署路径为 ~/workfactory-pipeline。
 
-配置和任务清单发生变化时使用新的输出目录。失败尝试保留在原目录，不覆盖旧结果。不要在任务运行期间修改代码、配置或来源文件。
+## 检查真实来源是否驱动模型
 
-## 并发配置
+以下命令调用模型，分别读取法律、教育职业资料及两组真实技能文档，执行意图生成与审查。它只检查来源到意图这部分，不生成完整环境。
 
-config/local.json 中的 task_workers 控制每个模型同时执行的任务数，api_max_concurrency 控制同一密钥下每个模型的在途请求数。api_limit_scope 设为 model 时两个模型独立限流。
+```bash
+python3 scripts/check_source_inputs.py --config /absolute/path/credentials.env --output runs/source-input-check
+```
 
-任务清单支持排队大量任务。64 或 1024 的 API 并发需要平台配额与实际压测支持，不代表本机可以同时启动相同数量的 Docker 容器。每个容器默认限制为 2 GB 内存与 1 CPU，先按可用内存设置任务并发。
-
-限流通过单机文件锁实现，跨机器的统一队列、限流与资源调度尚未实现。同一输出目录有进程锁，重复启动不会复制同一模型批次。调整 API 并发前应先停止共享同一模型配额的进程。
-
-## 输入与输出
-
-config/cases.json 提供任务入口。目前五条仍是合成职业情境，需要真实职业、技能和交付物来源池才能开展论文级规模实验。
-
-每个模型与任务单独保存。
+## 输出与恢复
 
 ```text
 runs/<batch>/<model>/<task>/
   seed.json
   status.json
   attempt-01/
+    initial_plan.json
     materialization-00/
     repair-1/
+    teacher_workspace/REQUEST.txt
+    teacher_workspace/inputs/
     teacher_workspace/outputs/
     trajectory.json
 ```
 
-trajectory.json 是教师候选轨迹。自动检查、人工验收与训练数据合格分别记录。长尾拒绝采样与训练 token 掩码尚未完成，不能直接宣称训练数据已验收。
+各阶段保存请求、响应、工具结果与检查结论。trajectory.json 是教师候选轨迹，人工验收和训练数据合格分别记录。batch_report.py 汇总批次状态。
 
-## API 调用位置
+完成任务会跳过，通过检查的阶段会复用。请求已保存但响应未保存时可从对话恢复。响应已保存而工具状态不明时停止并要求审查。更改代码、配置或输入后应使用新批次目录，保留失败尝试。
 
-- pilot.py 的 complete 负责模型请求、流式响应与有限重试
-- model_clients.py 提供两个明确模型入口
-- api_gate.py 控制跨进程的模型请求并发
-- batch_generate.py 编排各阶段，并支持 stage_models 配置覆盖
-- tool_runtime.py 驱动探针与教师的工具循环
-- docs/API_AND_PIPELINE.txt 列出各阶段 API 输入输出与论文对应
+API 调用入口为 pilot.py，限流在 api_gate.py，阶段编排在 batch_generate.py，工具循环在 tool_runtime.py，容器生命周期在 docker_runtime.py，阶段提示词和输出契约位于 prompts/ 与 schemas/。
 
-真实检索服务尚未接入。external_retrieval 为 true 时明确报错。当前不使用 SerpAPI 替代未确定的 WorkFactory 检索实现。
+## 当前验证与待完成部分
 
-## 验证边界
+Dockerfile 已成功构建，容器内四种文档格式的生成、读回与输入只读检查通过。已有三条 DeepSeek 多格式任务完成环境与教师候选轨迹生成，尚未统一完成人工验收。
 
-单元测试覆盖编排、工具访问边界、并发锁与后台任务配置。多格式文件已做本机生成与读回检查。后台独立进程验证不调用付费模型。本机首次验证被 macOS 拒绝访问 Documents。部署到 ~/workfactory-pipeline 后，launchd 在启动命令退出后独立完成测试脚本，退出码为 0。这验证了后台进程启动与文件访问，不代表付费模型全链路或高并发已通过。
+真实职业与技能来源已经接入。职业上下文的动态网页搜索、真实专业交付物来源池、长轨迹拒绝采样、训练 token 掩码、跨机器调度和高并发压力测试仍待完成。external_retrieval=true 时当前会明确报错，不自动替换检索服务。
 
-新版 Docker 全链路、MiMo Flash 成功轨迹、多模型高并发吞吐、自动故障恢复仍需实际验证。旧 runs 中的 XLSX 试跑结果不能作为这些能力的验收证据。
-
-## Linux 开发机独立批量运行
-
-控制器使用 Python 标准库。Docker 模式下，文件处理全部通过容器中的 execute_command 完成，不依赖 Codex、macOS、本机 Artifact Tool 或本机 Office。
-
-```bash
-python3 run_models.py --config /absolute/path/credentials.env --pipeline-config config/pipeline.json --output runs/batch-001
-```
-
-可在开发机已有的 tmux 或作业调度器中启动该命令。service.py 仅用于 macOS。Linux 的后台进程管理由开发机的作业系统负责。
-
-修改 task_workers 和 api_max_concurrency 设置每个模型的任务并发与请求并发。两组模型同时启动，组内按阶段顺序执行。先验证小批量，再依据平台限额和容器资源逐步增大。
-
-## 三条多格式 DeepSeek 样例
-
-config/multiformat-three.json 包含采购、项目管理、客服分析三个合成职业任务，分别要求 PDF、DOCX、PPTX、CSV、JSON 等资料和交付物。该配置用于验证多格式能力，不限制默认管线的格式选择。
-
-```bash
-python3 batch_generate.py --config /absolute/path/credentials.env --pipeline-config config/multiformat-three-policy.json --output runs/deepseek-multiformat-three --model deepseek-v4.1-flash-1017
-```
-
-该样例每个模型最多同时运行两个任务和两个模型请求。HTTP 429 与临时网关错误会有限重试，耗尽后保存错误。
+GitHub 保存源码、配置、提示词、测试、说明、Dockerfile 和小型固定来源资源，不保存 Docker 镜像或容器。开发机从 Docker Hub 拉取基础镜像并按 Dockerfile 构建独立环境。

@@ -23,14 +23,6 @@ from tool_runtime import inventory, run_agent
 from pipeline_config import load_policy, source_cases, stage_config
 from preflight import check_runtime
 
-SEEDS = [
-    ('procurement', '采购专员', '比较三家供应商两种运输纸箱的三年总成本净现值，考虑采购量、运费、价格调整、产能和交期，给采购经理推荐。提供明确付款时点、折现和税费口径。'),
-    ('invoice', '应付账款专员', '核对一个月十二条发票与采购订单，识别价格、数量和重复开票差异，按处理权限和优先级生成差异台账及行动清单。区分异常事件数与受影响记录数，按币种分别汇总。'),
-    ('inventory', '库存计划员', '根据八个 SKU 的当前库存、已确认在途、未来四周需求、提前期和最小订货批量，计算缺货风险与补货建议，考虑统一采购预算并解释优先级。明确周内到货和消耗顺序。'),
-    ('project', '项目经理', '依据十项项目活动的依赖、计划工时、实际进度、人员容量和里程碑，识别延期风险并制定未来两周恢复计划。明确进度统计日期、工作日口径及人员调配权限。'),
-    ('support', '客服运营分析师', '汇总一个月十五条客服工单，计算响应和解决时长、SLA 达标率、分类问题和改进优先级，提供逐工单证据。明确时区、营业时间、未关闭工单和排除项处理规则。'),
-]
-
 
 def cases(policy=None):
     return source_cases(policy or load_policy())

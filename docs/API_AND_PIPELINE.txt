@@ -25,7 +25,7 @@ model_clients.py 提供 call_deepseek 和 call_mimo 两个显式入口。
 config/pipeline.json 是可提交的配置模板，不包含密钥和本机绝对路径。
 config/local.json 是当前主机配置，禁止提交。
 source_cases 指向任务入口清单，每条须包含来源与合成权限。
-config/cases.json 保留五个旧职业情境作为合成示例，不冒充真实来源。
+默认 source_cases 已改为 data/source_pools/cases.json，由 source_pools.py 采集、关联和抽样产生。config/cases.json 仅保留测试情境。
 调用方可以传入职业资料、技能文本或真实交付物摘要，选择对应 stage。
 stage_models 可逐阶段指定模型，省略时使用命令行 model。
 allowed_reference_formats 为空表示不限定文件后缀。
@@ -53,10 +53,10 @@ api_gate 使用操作系统文件锁，支持同一主机多个进程并发共�
 
 当前未完成的原文环节
 真实搜索提供商尚未确定，external_retrieval=true 会明确阻塞。
-真实职业库、技能库和交付物来源池尚未批量导入。
+BLS SOC 与 O*NET 职业库和 skills.sh 技能文档已导入；真实交付物来源池仍待接入。
 最长百分之五的拒绝采样和最终 tokenizer loss mask 尚未接入批量入口。
 当前轨迹仍标记为候选，不能标记成最终训练数据。
-Docker 镜像构建和混合格式端到端模型试跑须通过后才能规模运行。
+Docker 镜像和三条多格式 DeepSeek 候选轨迹已经跑通；大规模并发和人工质量验收仍待完成。
 
 原文来源
 https://arxiv.org/abs/2610.37161

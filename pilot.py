@@ -3,6 +3,7 @@ import argparse
 import hashlib
 import json
 import os
+import socket
 import time
 import urllib.error
 import urllib.request
@@ -118,7 +119,7 @@ def _complete_with_retries(config, messages, max_tokens, tool_definitions=None):
         if attempt and config.get('_STREAM_LOG'):
             p=Path(config['_STREAM_LOG']);current['_STREAM_LOG']=str(p.with_name(p.stem+f'-retry-{attempt:02d}'+p.suffix))
         try:return complete_once(current,messages,max_tokens,tool_definitions)
-        except (urllib.error.URLError,http.client.RemoteDisconnected,TimeoutError,ConnectionError) as exc:
+        except (urllib.error.URLError,http.client.RemoteDisconnected,socket.timeout,TimeoutError,ConnectionError) as exc:
             if config.get('_STREAM_LOG'):
                 p=Path(config['_STREAM_LOG']).with_suffix('.transport.jsonl')
                 with p.open('a') as log:

@@ -17,3 +17,7 @@ dist/
 *.oci
 *.qcow2
 *.raw
+
+# Downloaded source pools and generated task manifests
+data/
+.venv/

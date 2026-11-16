@@ -1,0 +1,42 @@
+来源池接入记录
+
+BLS
+论文指定来源固定为 https://www.bls.gov/soc/2018/major_groups.htm 。
+普通 HTTP 脚本和 curl 收到 403，响应正文为 Access Denied，并说明自动采集限制。
+同一地址在正常 Chrome 浏览器可访问，使用保存网页仅 HTML 获得完整官方页面。
+resources/soc-2018 包含固定快照和 URL、时间、哈希，开发机可直接读取。
+source_pools.py 的 fetch-soc 复制固定资源到本地缓存，再解析职业层级和描述。
+不切换其他来源。显式更新可用 fetch-soc --import-html 导入同一地址的新快照。
+解析结果为 23 大类、867 个细分职业，总计 1447 个各层级编码。
+
+O*NET
+官方 CSV 下载固定为 31.0 版。
+下载 occupation_data、task_statements、essential_skills、transferable_skills、work_activities 和 content_model_reference。
+按 O*NET-SOC 编码关联职责、任务、技能、活动，使用 SOC 基础编码关联 BLS。
+已读取 1016 个职业记录与 18838 条任务描述，SOC 基础编码关联完整。
+采用官方 CC BY 4.0 标注，派生文件与合成内容分开记录。
+原文未说明使用 O*NET；这是用户要求加入的扩展来源。
+
+skills.sh
+从站点目录和配置中的领域目录采集网页中的 SKILL.md 文档正文。
+记录网页 URL、原仓库链接、正文哈希和本地网页快照。
+未安装技能、未执行文档指令，不把站点流行度等同于职业分布。
+采集范围由 config/source-pools.json 控制，每个仓库有上限，防止单一仓库占满候选。
+96 份文档中 91 份达到当前正文长度门槛，其他短别名文档保留但不参与组合。
+TF-IDF 只提名相关文档组，01b 模型必须验证真实输入输出兼容性，无法组合则拒绝。
+
+接入主流程
+source_pools.py build 输出 data/source_pools/cases.json。
+config/pipeline.json 默认 source_cases 指向该文件。
+第一阶段直接收到来源文档正文，后续阶段按同一管线执行。
+当前生成了 1016 个职业入口和 24 个技能组合入口，共 1040 个候选输入。
+这些数字不代表已经生成或验收了 1040 个环境。
+
+持久化
+采集与解析代码、配置、BLS 固定资源、测试和说明进入 Git。
+O*NET 与技能网页快照及派生输入位于本地 data/，由脚本重复构建。
+运行结果、模型密钥、Docker 镜像不上传 GitHub。
+
+未完成
+职业上下文动态搜索和真实交付物入口仍待接入。
+当前没有复现论文全部来源池或职业频率分布。

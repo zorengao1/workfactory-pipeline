@@ -38,7 +38,7 @@ def main():
     parser.add_argument('--output', required=True)
     parser.add_argument('--config')
     parser.add_argument('--pipeline-config')
-    parser.add_argument('--models', nargs='+', choices=['deepseek-v4.1-flash-1017', 'mimo-v2.6-flash'],
+    parser.add_argument('--models', nargs='+', choices=['deepseek-v4.1-flash-1017', 'mimo-v2.6-flash', 'gpt-6.1-sol'],
                         default=['deepseek-v4.1-flash-1017', 'mimo-v2.6-flash'])
     args = parser.parse_args()
     if sys.platform != 'darwin':

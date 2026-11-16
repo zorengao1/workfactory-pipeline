@@ -1,0 +1,8 @@
+{
+  "url": "https://www.bls.gov/soc/2018/major_groups.htm",
+  "resolved_url": "https://www.bls.gov/soc/2018/major_groups.htm",
+  "retrieved_at": "2026-11-16T15:16:08.672819+00:00",
+  "sha256": "7e17b912210bf7ed4ebf99993ec2fe06795a8d241646c5b7292f7f987b3c162b",
+  "bytes": 584972,
+  "method": "Explicit import of browser-saved official HTML; direct script access received HTTP 403"
+}

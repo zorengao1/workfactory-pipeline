@@ -7,6 +7,12 @@ from batch_generate import cases, run_case, StageRejected, text_stage, agent
 from pilot import read_json, save
 
 
+def example_cases():
+    from pipeline_config import load_policy
+    policy=load_policy();policy['source_cases']='config/cases.json'
+    return cases(policy)
+
+
 class BatchTests(unittest.TestCase):
     def test_resume_reuses_accepted_text_retry(self):
         with tempfile.TemporaryDirectory() as td:
@@ -29,7 +35,7 @@ class BatchTests(unittest.TestCase):
             self.assertTrue((stage/'05-request.json').exists())
 
     def test_matched_seeds_have_unique_ids_and_supported_resources(self):
-        seeds=cases()
+        seeds=example_cases()
         self.assertEqual(len({c['task_id'] for c in seeds}),5)
         for c in seeds:
             self.assertEqual(c['constraints']['allowed_reference_formats'],[])
@@ -38,7 +44,7 @@ class BatchTests(unittest.TestCase):
 
     def test_success_is_not_repeated_and_failed_attempt_is_preserved(self):
         with tempfile.TemporaryDirectory() as td:
-            root=Path(td);case=cases()[0];config={'OPENAI_MODEL':'test','OPENAI_API_KEY':'secret'}
+            root=Path(td);case=example_cases()[0];config={'OPENAI_MODEL':'test','OPENAI_API_KEY':'secret'}
             with patch('batch_generate.attempt',side_effect=[StageRejected('bad plan'),'candidate.json']) as stage:
                 run_case(case,root,config)
                 run_case(case,root,config)
@@ -49,7 +55,7 @@ class BatchTests(unittest.TestCase):
 
     def test_transport_failure_stops_case_and_redacts_secret(self):
         with tempfile.TemporaryDirectory() as td:
-            root=Path(td);case=cases()[0];config={'OPENAI_MODEL':'test','OPENAI_API_KEY':'secret'}
+            root=Path(td);case=example_cases()[0];config={'OPENAI_MODEL':'test','OPENAI_API_KEY':'secret'}
             with patch('batch_generate.attempt',side_effect=RuntimeError('secret HTTP 429')) as stage:
                 with self.assertRaises(RuntimeError):run_case(case,root,config)
             self.assertEqual(stage.call_count,1)
