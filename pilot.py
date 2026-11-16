@@ -40,6 +40,10 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+class TransientAPIError(ConnectionError):
+    """Provider throttling or temporary gateway failure; safe to retry a request."""
+
+
 class IncompleteStreamError(ConnectionError, RuntimeError):
     """A truncated response has no executable tool calls and can be retried."""
 
@@ -94,6 +98,8 @@ def complete_once(config, messages, max_tokens, tool_definitions=None):
             result = collect_stream(response,config.get('_STREAM_LOG'),config['OPENAI_API_KEY']) if streaming else json.load(response)
     except urllib.error.HTTPError as exc:
         # Never persist response bodies from auth/transport failures.
+        if exc.code in {429,500,502,503,504}:
+            raise TransientAPIError("API HTTP " + str(exc.code)) from None
         raise RuntimeError("API HTTP " + str(exc.code)) from None
     result = json.loads(json.dumps(result).replace(config["OPENAI_API_KEY"], "[REDACTED]"))
     return result

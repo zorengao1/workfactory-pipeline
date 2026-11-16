@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "task_workers": 2,
+  "api_max_concurrency": 2,
+  "api_limit_scope": "model",
+  "max_agent_turns": 250,
+  "initial_build_retries": 3,
+  "repair_rounds": 3,
+  "allowed_reference_formats": [],
+  "required_deliverable_formats": [],
+  "reference_file_count": null,
+  "external_retrieval": false,
+  "source_cases": "config/multiformat-three.json",
+  "stage_models": {},
+  "runtime": {
+    "node": "",
+    "python": "",
+    "docx_renderer": "",
+    "pptx_finalizer": ""
+  },
+  "sandbox": {
+    "backend": "docker",
+    "image": "workfactory/runtime:v2",
+    "memory": "2g",
+    "cpus": 1,
+    "command_timeout_seconds": 120
+  }
+}

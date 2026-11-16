@@ -1,0 +1,50 @@
+[
+  {
+    "task_id": "vendor-review-002",
+    "stage": "01a_occupation",
+    "source_materials": [
+      {
+        "source_id": "vendor-review-002-synthetic",
+        "provenance": "合成职业情境，非真实企业资料",
+        "content": "采购经理。评审三家供应商采购方案，结合需求、报价、运费、付款条件、质量认证和交付能力计算年度可比成本并给出推荐。"
+      }
+    ],
+    "constraints": {
+      "synthesis_allowed": true,
+      "scope": "评审三家供应商采购方案，结合需求、报价、运费、付款条件、质量认证和交付能力计算年度可比成本并给出推荐。",
+      "format_requirements": "参考文件包含 PDF 报价、DOCX 商务条款、CSV 需求数据；教师交付 DOCX 评审报告和 CSV 成本明细。"
+    }
+  },
+  {
+    "task_id": "project-recovery-002",
+    "stage": "01a_occupation",
+    "source_materials": [
+      {
+        "source_id": "project-recovery-002-synthetic",
+        "provenance": "合成职业情境，非真实企业资料",
+        "content": "项目经理。分析软件上线项目的活动依赖、进度、团队容量、验收条款和风险，制定未来两周恢复计划。"
+      }
+    ],
+    "constraints": {
+      "synthesis_allowed": true,
+      "scope": "分析软件上线项目的活动依赖、进度、团队容量、验收条款和风险，制定未来两周恢复计划。",
+      "format_requirements": "参考文件包含 CSV 计划、DOCX 验收规则、PDF 周报、JSON 人员容量；教师交付 PPTX 汇报和 CSV 恢复排期。"
+    }
+  },
+  {
+    "task_id": "service-quality-002",
+    "stage": "01a_occupation",
+    "source_materials": [
+      {
+        "source_id": "service-quality-002-synthetic",
+        "provenance": "合成职业情境，非真实企业资料",
+        "content": "客服运营分析师。分析工单响应与解决时长、SLA 达标率、业务影响，提出有证据的改进方案。"
+      }
+    ],
+    "constraints": {
+      "synthesis_allowed": true,
+      "scope": "分析工单响应与解决时长、SLA 达标率、业务影响，提出有证据的改进方案。",
+      "format_requirements": "参考文件包含 JSON 工单、PDF SLA 政策、CSV 分类影响数据、DOCX 运营约束；教师交付 PDF 报告和 CSV 逐单计算证据。"
+    }
+  }
+]

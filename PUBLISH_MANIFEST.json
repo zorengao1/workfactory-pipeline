@@ -5,7 +5,7 @@
   },
   {
     "path": "pilot.py",
-    "sha256": "914094f9e6ec12bd9cf79d41ec83fb0f2e5ca854d63e95858398b2f2034d8fec"
+    "sha256": "835a232d441f9307bb1d5985b504a3e3ccfd9a6f7363750b8cbc97ce7176f9c8"
   },
   {
     "path": "model_clients.py",
@@ -269,7 +269,7 @@
   },
   {
     "path": "README.md",
-    "sha256": "5b45031f271f2a1694317f0a9241e5fa7f9b0d082de3959988ed8e38bf28f13b"
+    "sha256": "aba38873f8b59dfc9af90d2cb98ed94fd478b14562adde58fc05e665c9ddb0e0"
   },
   {
     "path": "service.py",
@@ -286,5 +286,13 @@
   {
     "path": "scripts/container_smoke.py",
     "sha256": "fa580966ca59d65e8009c13a5acefbb63731b885a15d47608b1a1b61c3cd5c59"
+  },
+  {
+    "path": "config/multiformat-three.json",
+    "sha256": "f843cbd33a045d6275c0c7ca488065d0eb7c095fccffc18da6cc97c7d4d7cbe9"
+  },
+  {
+    "path": "config/multiformat-three-policy.json",
+    "sha256": "7f80f4b77ff95a83519e182d0fe87d03af4179088f1a9e50d0a618a38740ea7d"
   }
 ]

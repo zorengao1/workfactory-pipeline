@@ -137,3 +137,13 @@ python3 run_models.py --config /absolute/path/credentials.env --pipeline-config 
 可在开发机已有的 tmux 或作业调度器中启动该命令。service.py 仅用于 macOS。Linux 的后台进程管理由开发机的作业系统负责。
 
 修改 task_workers 和 api_max_concurrency 设置每个模型的任务并发与请求并发。两组模型同时启动，组内按阶段顺序执行。先验证小批量，再依据平台限额和容器资源逐步增大。
+
+## 三条多格式 DeepSeek 样例
+
+config/multiformat-three.json 包含采购、项目管理、客服分析三个合成职业任务，分别要求 PDF、DOCX、PPTX、CSV、JSON 等资料和交付物。该配置用于验证多格式能力，不限制默认管线的格式选择。
+
+```bash
+python3 batch_generate.py --config /absolute/path/credentials.env --pipeline-config config/multiformat-three-policy.json --output runs/deepseek-multiformat-three --model deepseek-v4.1-flash-1017
+```
+
+该样例每个模型最多同时运行两个任务和两个模型请求。HTTP 429 与临时网关错误会有限重试，耗尽后保存错误。
