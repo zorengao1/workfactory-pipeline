@@ -1,0 +1,14 @@
+【任务】
+独立判断修订环境是否保留初始任务的必要工作。
+
+【输入】
+读取 task_id、original_intent、initial_plan、original_environment、revised_environment、repair_report、program_checks。
+
+【执行规则】
+只读对照初始目标与修订内容，检查核心目标、必要操作、交付物实质要求、文件数量类型及依赖是否保留。允许为恢复可解条件做小幅调整；不得以删除分析、缩减必要对象或提供结论消除工作。检查隐藏要求是否被不当转成答案。对每项判断给出原要求和修订后证据。
+
+【输出格式】
+完成审查时 status 为 ok，verdict 为 pass 或 fail。证据不足以核对时返回 blocked。不得改写任务。
+
+【验收要求】
+checks 覆盖 objective、operations、deliverables、file_structure、no_answer_leakage；任一失败则 verdict 为 fail。通过仅允许进入新一轮干净探测。

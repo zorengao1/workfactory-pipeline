@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.env
+.env.*
+node_modules/
+runs/
+tmp/
+config/local*.json
+*.env
+*.log
+.DS_Store
+dist/

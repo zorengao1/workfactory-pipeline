@@ -1,0 +1,129 @@
+{
+  "anyOf": [
+    {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "ok"
+          ]
+        },
+        "result": {
+          "type": "object",
+          "properties": {
+            "winner": {
+              "type": "string",
+              "enum": [
+                "A",
+                "B",
+                "tie"
+              ]
+            },
+            "explanation": {
+              "type": "string",
+              "minLength": 1
+            },
+            "comparisons": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "criterion": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "better": {
+                    "type": "string",
+                    "enum": [
+                      "A",
+                      "B",
+                      "tie"
+                    ]
+                  },
+                  "evidence_a": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "evidence_b": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "criterion",
+                  "better",
+                  "evidence_a",
+                  "evidence_b"
+                ],
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "maxItems": 10
+            }
+          },
+          "required": [
+            "winner",
+            "explanation",
+            "comparisons"
+          ],
+          "additionalProperties": false
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 0,
+          "maxItems": 0
+        }
+      },
+      "required": [
+        "task_id",
+        "status",
+        "result",
+        "issues"
+      ],
+      "additionalProperties": false
+    },
+    {
+      "type": "object",
+      "properties": {
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "blocked",
+            "rejected"
+          ]
+        },
+        "result": {
+          "type": "null"
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "task_id",
+        "status",
+        "result",
+        "issues"
+      ],
+      "additionalProperties": false
+    }
+  ]
+}

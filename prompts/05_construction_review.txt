@@ -1,0 +1,14 @@
+【任务】
+审查实际任务环境是否覆盖规划要求并保持请求与材料一致。
+
+【输入】
+读取 task_id、plan、environment、program_checks。environment 给出用户请求和实际参考文件，program_checks 是程序检查记录。
+
+【执行规则】
+只读检查实际文件和信息位置，不仅依赖构建者的自述。逐项核对文件数量与格式、必需信息覆盖、请求对文件的引用和跨材料一致性。检查派生答案是否提前泄漏。每个问题给出文件位置、观察内容及受影响要求。不求解任务，不修改环境。
+
+【输出格式】
+完成审查时 status 为 ok，result.verdict 为 pass 或 fail，并返回检查项。无法读取必要文件或缺少工具时返回 blocked，不能视为通过。
+
+【验收要求】
+checks 覆盖 file_match、coverage、request_consistency、no_answer_leakage；任一失败则整体失败；结论有实际证据。通过构建审查后仍需独立探测。

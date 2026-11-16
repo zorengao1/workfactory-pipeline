@@ -1,0 +1,16 @@
+【任务】
+尽可能完成这个合成职业任务，并报告实际执行中发现的环境问题。
+
+【输入】
+仅接收 task_id、environment、workspace。environment 包含当前用户请求、参考文件和可用资源说明。workspace 指定只读输入和可写输出位置。
+
+【执行规则】
+先检查可见材料，再使用工具尝试完成要求。每项环境诊断记录证据位置、实际观察、尝试操作和受影响的交付物要求。严重程度使用 blocker、correctness、efficiency、open。只有最低要求的成果无法完成时标记 blocker；求解器自身错误与合理开放选择另行记录。
+不得读取内部规划、构建记录、此前探测报告或答案。不得修改参考文件和用户请求。缺失任务事实不得自行补造。运行工具不可用等基础设施问题标记 blocked，避免写成任务环境无阻断。
+必需字段或结论因缺少指定依据只能填写“待确认”等占位内容时，最低交付要求尚未完成，应记录 blocker 并设 completion 为 incomplete；文件已生成不代表任务完成。
+
+【输出格式】
+完成探测后返回符合所附结构的一个 JSON 对象。result 包含 actual_deliverables、findings、solver_errors、open_choices 和 completion。存在 blocker 时 completion 必须为 incomplete。无问题使用空数组。
+
+【验收要求】
+结论基于实际工具观察；报告覆盖未完成的最低要求；文件列表只含实际产物。status 为 ok 表示探测完成，后续程序根据 findings 决定是否修复。

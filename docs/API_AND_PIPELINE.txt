@@ -1,0 +1,63 @@
+WorkFactory 本地复现接口说明
+
+代码边界
+这是根据论文重写的本地实现。官方仓库没有公开完整构建程序。
+原文附录 A 规定职业、技能和真实交付物三个意图入口。
+附录 B.3 规定动态检索真实材料并选择复用、改写或合成，没有指定 SerpAPI。
+附录 C 规定独立探针、仅阻断触发修复、最多三轮修复和工作保留审查。
+附录 D.3 规定构建与探针使用 DeepSeek V4 Flash 0731，教师使用 GLM 5.3。
+本实验按用户要求，构建和教师分别都使用 DeepSeek V4.1 Flash 1017 或 MiMo V2.6 Flash。
+
+API 调用位置
+pilot.py 的 complete_once 是唯一模型 HTTP 请求实现。
+请求使用 OPENAI_BASE_URL 加 chat/completions，密钥只从外部 env 文件读取。
+model_clients.py 提供 call_deepseek 和 call_mimo 两个显式入口。
+文本阶段由 pilot.run_stage 调用，文件阶段由 tool_runtime.run_agent 调用。
+01a、01b、01c 意图生成需要模型 API。
+02 意图审查、03 信息图规划需要模型 API。
+04 文件构建需要模型 API，由模型调用文件工具或容器代码工具。
+05 构建内容审查、06 探针、07 修复、08 工作保留审查需要模型 API。
+09 教师独立执行需要模型 API。
+10 成对评审 prompt 已有，当前批量入口尚未自动执行长尾拒绝采样。
+文件数量、类型、哈希、Docker 执行、文件渲染和轨迹导出不调用模型 API。
+
+配置
+config/pipeline.json 是可提交的配置模板，不包含密钥和本机绝对路径。
+config/local.json 是当前主机配置，禁止提交。
+source_cases 指向任务入口清单，每条须包含来源与合成权限。
+config/cases.json 保留五个旧职业情境作为合成示例，不冒充真实来源。
+调用方可以传入职业资料、技能文本或真实交付物摘要，选择对应 stage。
+stage_models 可逐阶段指定模型，省略时使用命令行 model。
+allowed_reference_formats 为空表示不限定文件后缀。
+reference_file_count 为 null 表示由规划决定数量，4.15 只用于统计对照。
+没有固定两份 XLSX，也没有固定教师必须输出 XLSX。
+
+并发
+任务之间并发，单个任务内部阶段顺序执行。
+task_workers 控制同时处理的任务数。
+api_max_concurrency 控制每个模型实际在途的 HTTP 请求数。
+api_limit_scope 默认 model，两个模型分别限流。
+api_gate 使用操作系统文件锁，支持同一主机多个进程并发共享配额。
+所有进程须使用同一锁目录和上限，不支持跨主机协调。
+锁上限发生变化时程序报错，须先停止相关任务再清理对应空闲锁目录。
+64 和 1024 是配置值，不代表本机可承载相同数量的 Docker 容器。
+每个容器默认 2GB 内存和 1 CPU，大并发前须评估主机资源。
+
+数据边界
+每个构建尝试保留初始意图和信息图，最多额外三次物化重试。
+每次探针和教师使用独立工作区和新容器。
+求解者只看请求和参考文件，内部计划、其他答案和 API 密钥不挂载。
+输入只读，outputs 可写，容器默认无网络，无宿主机 Docker socket。
+任意模型代码只在新建的 workfactory/runtime 镜像中执行。
+固定文件工具是可选的便利入口，容器代码允许处理更多格式。
+
+当前未完成的原文环节
+真实搜索提供商尚未确定，external_retrieval=true 会明确阻塞。
+真实职业库、技能库和交付物来源池尚未批量导入。
+最长百分之五的拒绝采样和最终 tokenizer loss mask 尚未接入批量入口。
+当前轨迹仍标记为候选，不能标记成最终训练数据。
+Docker 镜像构建和混合格式端到端模型试跑须通过后才能规模运行。
+
+原文来源
+https://arxiv.org/abs/2610.37161
+https://github.com/IQuestLab/WorkFactory

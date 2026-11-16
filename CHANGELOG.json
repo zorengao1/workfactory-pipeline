@@ -1,0 +1,244 @@
+[
+  {
+    "id": "OBS-001",
+    "version": "v1",
+    "origin": "observed_model_output",
+    "evidence": "runs/pilot-v0/pilot_occupation_001/01a_occupation/parsed.json",
+    "problem": "required_inputs 遗漏折现率等计算规则，审查仍通过",
+    "change": "三路生成明确输入包含数据、规则和约束；审查逐项核对必要操作及已提及条件",
+    "retest": "runs/regression-v1 与 runs/pilot-v1",
+    "status": "historical_experiment_superseded_by_stage_boundary_correction"
+  },
+  {
+    "id": "LOCAL-001",
+    "version": "v1",
+    "origin": "local_interface_review",
+    "problem": "修复模板要求遵循初始合成权限，但输入未显式传入 constraints",
+    "change": "修复输入增加 constraints",
+    "retest": "tests/test_contracts.py 与模板结构检查",
+    "status": "static_only"
+  },
+  {
+    "id": "RUN-001",
+    "version": "v1",
+    "origin": "api_read_timeout",
+    "evidence": "runs/pilot-v0/summary.json",
+    "problem": "首次规划调用读取超时，未取得输出",
+    "change": "同接口同模型的读取超时从 180 秒调整到 600 秒，保留首次失败，无模型切换",
+    "retest": "runs/final-pilot-v2",
+    "status": "targeted_checks_passed_in_three_case_pilot"
+  },
+  {
+    "id": "OBS-002",
+    "version": "v2",
+    "origin": "observed_review_overreach",
+    "evidence": "runs/pilot-v1/pilot_occupation_001/02_intent_review/parsed.json",
+    "problem": "审查将文件数量格式也要求复述到职业意图中，并要求每项输入对应独立操作",
+    "change": "明确构建参数由规划落实，输入无需逐项复述为独立操作",
+    "retest": "runs/review-regression-v2",
+    "status": "historical_experiment_superseded_by_stage_boundary_correction"
+  },
+  {
+    "id": "OBS-003",
+    "version": "v3",
+    "origin": "failed_regression",
+    "evidence": "runs/review-regression-v2/v0/02_intent_review/parsed.json",
+    "problem": "放宽构建参数检查后，审查将合成授权解释为可省略必要输入类别，旧漏项样例再次通过",
+    "change": "增加一条合成授权不豁免输入类别完整性的规则和一个简短正反例",
+    "retest": "runs/review-regression-v3",
+    "status": "historical_experiment_superseded_by_stage_boundary_correction"
+  },
+  {
+    "id": "RUN-002",
+    "version": "v2",
+    "origin": "empty_model_content",
+    "evidence": "runs/pilot-v1/pilot_skill_001/01b_skill/response.json",
+    "problem": "finish_reason 为 stop，但 content 为空",
+    "change": "保持严格解析，不读取 reasoning_content 作为结果；同接口同模型单独复测技能路线",
+    "retest": "runs/skill-retry-v2",
+    "status": "retry_intent_and_review_passed_plan_rejected_internal_binding"
+  },
+  {
+    "id": "OBS-004",
+    "version": "v4",
+    "origin": "model_format_failure",
+    "evidence": "runs/plan-retry-v0/03_plan/response.json",
+    "problem": "模型用 Markdown 围栏包装 JSON，严格解析失败",
+    "change": "规划输出明确首字符和末字符，禁止围栏；未自动修补输出",
+    "retest": "runs/final-pilot-v2",
+    "status": "targeted_checks_passed_in_three_case_pilot"
+  },
+  {
+    "id": "OBS-005",
+    "version": "final-v1",
+    "origin": "model_contract_failure",
+    "evidence": "runs/skill-retry-v2/pilot_skill_001/03_plan/parsed.json",
+    "problem": "公开交付物要求被标记 internal 并绑定公开载体",
+    "change": "明确公开要求属于 supplied，待生成内容属于 derived，internal 仅供隐藏构建说明",
+    "retest": "runs/final-pilot-v2",
+    "status": "targeted_checks_passed_in_three_case_pilot"
+  },
+  {
+    "id": "OBS-006",
+    "version": "final-v1",
+    "origin": "manual_semantic_review",
+    "evidence": "runs/pilot-v1/pilot_deliverable_001/03_plan/parsed.json",
+    "problem": "计划把十条原始工单的生成目标写成已确定 value，未提供实际记录；新合成规则与来源材料未清楚区分",
+    "change": "增加 construction_spec 与 value 二选一，区分后续材料生成规格和既定值；要求标明合成来源",
+    "retest": "runs/final-pilot-v2",
+    "status": "targeted_checks_passed_in_three_case_pilot"
+  },
+  {
+    "id": "DESIGN-001",
+    "version": "final-v1",
+    "origin": "paper_boundary_recheck",
+    "evidence": "WorkFactory appendix A and B; runs/review-regression-v2 and v3",
+    "problem": "把详细输入清单完备性提前作为意图拒绝门槛，超出意图合理性审查职责，导致过度拒绝与反复不稳定",
+    "change": "撤回严格漏项门槛；意图审查允许后续规划补充细节，仅因明确不可获取的必要事实或能力等实质问题拒绝",
+    "retest": "runs/final-pilot-v2",
+    "status": "targeted_checks_passed_in_three_case_pilot"
+  },
+  {
+    "id": "OBS-007",
+    "problem": "发票与采购单缺少共有匹配键，关联规则引用单侧不存在的字段",
+    "change": "两侧显式提供稳定键，待比较差异字段不作为唯一匹配依据",
+    "evidence": "runs/final-pilot-v2/pilot_skill_001/03_plan/parsed.json",
+    "version": "semantic-v1",
+    "origin": "manual_semantic_review",
+    "retest": "runs/plan-semantic-retest-v1",
+    "status": "targeted_manual_check_passed",
+    "result": "两侧均安排 po_number 与 po_line_no，金额和币种用于关联后的比较"
+  },
+  {
+    "id": "OBS-008",
+    "problem": "用户请求将构建合成权限转交求解者，并把技能卡名称当作可调用工具",
+    "change": "区分构建与求解权限，只有环境提供的工具才要求按名称调用",
+    "evidence": "runs/final-pilot-v2/pilot_skill_001/03_plan/parsed.json; runs/final-pilot-v2/pilot_deliverable_001/03_plan/parsed.json",
+    "version": "semantic-v1",
+    "origin": "manual_semantic_review",
+    "retest": "runs/plan-semantic-retest-v1",
+    "status": "targeted_manual_check_passed_after_example",
+    "result": "用户请求已改写成业务动作，没有要求调用技能卡名称",
+    "additional_retest": "runs/skill-name-retest-v1"
+  },
+  {
+    "id": "OBS-009",
+    "problem": "客服业务时长排除法定节假日，但没有提供节假日日历，且禁止外部检索",
+    "change": "计算依赖的日历、截止点和缺失值处理必须安排到输入",
+    "evidence": "runs/final-pilot-v2/pilot_deliverable_001/03_plan/parsed.json",
+    "version": "semantic-v1",
+    "origin": "manual_semantic_review",
+    "retest": "runs/plan-semantic-retest-v1",
+    "status": "targeted_manual_check_passed",
+    "result": "生成自然时长口径，明示截止时间和缺失值处理，无外部节假日日历依赖"
+  },
+  {
+    "id": "OBS-010",
+    "version": "semantic-v2",
+    "origin": "api_output_truncated",
+    "evidence": "runs/plan-semantic-retest-v1/pilot_occupation_001/03_plan/validation.json",
+    "problem": "每家供应商的单价、交期、产能等拆成独立节点，输出达到长度上限被截断",
+    "change": "同结构记录合并为表级节点，避免逐记录逐字段建节点",
+    "retest": "runs/occupation-size-retest-v1",
+    "status": "targeted_manual_check_passed",
+    "result": "完整输出十四个信息节点和两份参考文件，finish_reason 为 stop，格式与程序约束通过"
+  },
+  {
+    "id": "OBS-011",
+    "origin": "actual_build_final_response",
+    "problem": "构建完成后回复正文说明和围栏 JSON，严格解析失败",
+    "change": "构建模板显式规定首尾字符并禁止围栏与说明",
+    "evidence": "runs/environment-pilot-v1/04_build/04-response.json",
+    "retest": "runs/environment-pilot-v2",
+    "status": "natural_language_rule_insufficient_see_PROTOCOL-001"
+  },
+  {
+    "id": "TOOL-001",
+    "origin": "visual_and_filesystem_review",
+    "problem": "日期显示序号，Artifact Tool 自动生成检查附属文件污染参考目录",
+    "change": "日期对象自动使用日期格式；导入导出均在日志目录中暂存，只复制 XLSX 到任务目录",
+    "evidence": "runs/environment-pilot-v1/04_build/tools; runs/environment-pilot-v1/04_build/validation.json",
+    "retest": "runs/environment-pilot-v2",
+    "status": "actual_file_isolation_and_five_sheet_visual_review_passed"
+  },
+  {
+    "id": "PROTOCOL-001",
+    "origin": "repeated_final_format_failure",
+    "problem": "工具阶段在两个构建尝试中重复输出说明和代码围栏，增强自然语言约束未解决",
+    "change": "新增 submit_result 工具，直接对其参数进行原有 schema 校验，不提取正文中的 JSON",
+    "evidence": "runs/environment-pilot-v1/04_build/04-response.json; runs/environment-pilot-v2/04_build/03-response.json",
+    "retest": "runs/environment-pilot-v3",
+    "status": "live_build_review_probe_submission_passed"
+  },
+  {
+    "id": "SOLVER-001",
+    "origin": "independent_actual_file_review",
+    "evidence": "runs/environment-pilot-v3/manual_qa.json",
+    "problem": "探针交付物摘要与重复发票明细的无差异行数统计不一致",
+    "change": "记录为求解器错误，保留原始输出；不修改环境，也不向独立教师暴露该诊断",
+    "status": "teacher_retest_pending"
+  },
+  {
+    "id": "OBS-012",
+    "origin": "teacher_actual_file_and_trace_review",
+    "problem": "教师摘要与明细计数口径不一致，且声称重读但没有重读工具调用",
+    "change": "教师模板增加保存后重读，以及计数对象、去重口径和分类合计核对要求",
+    "evidence": "runs/environment-pilot-v3/manual_qa.json",
+    "retest": "runs/teacher-summary-retest-v1",
+    "status": "targeted_final_checks_passed_see_teacher-render-recheck-v1"
+  },
+  {
+    "id": "OBS-013",
+    "origin": "controlled_missing_premise_test",
+    "problem": "探针发现必需的处理权限缺失，却将该问题标为 correctness，填待确认并宣称 complete，阻断修复入口",
+    "change": "必需内容因缺失依据只能占位时，明确判 blocker 和 incomplete",
+    "evidence": "runs/repair-negative-v1/06_probe/parsed.json",
+    "retest": "runs/repair-negative-v2 and runs/repair-negative-v3",
+    "status": "semantic_blocker_detected_then_contract_corrected_and_one_repair_cycle_passed"
+  },
+  {
+    "id": "PROTOCOL-002",
+    "origin": "missing_saved_output_readback",
+    "problem": "教师模板要求重读后，模型仍可未重读直接提交成功",
+    "change": "工具执行器检查最终 XLSX 是否在最近一次写入后被成功重读；缺失时返回提交错误",
+    "evidence": "runs/teacher-summary-retest-v1/09_teacher",
+    "retest": "runs/teacher-readback-gate-v1 and runs/teacher-readback-gate-resume-v1",
+    "status": "live_readback_and_contract_passed_visual_format_failed"
+  },
+  {
+    "id": "TOOL-002",
+    "origin": "rendered_output_review",
+    "problem": "模型将 bold 与 wrap 作为数字格式，数据值正确但显示为格式字面量",
+    "change": "数字格式采用明确白名单，换行和表头样式由固定工具处理",
+    "evidence": "runs/teacher-readback-gate-v1/09_teacher/tools/workbook-003 and workbook-004",
+    "retest": "runs/teacher-format-gate-v1",
+    "status": "numeric_formats_passed_new_unit_issue_found"
+  },
+  {
+    "id": "OBS-014",
+    "origin": "actual_teacher_workbook_review",
+    "problem": "把不同币种金额直接相加为合计",
+    "change": "教师汇总前核对单位，金额按币种分别计算，未提供汇率不得跨币种求和",
+    "evidence": "runs/teacher-format-gate-v1/manual_qa.json",
+    "retest": "runs/teacher-units-retest-v1",
+    "status": "targeted_final_checks_passed_see_teacher-render-recheck-v1"
+  },
+  {
+    "id": "OBS-015",
+    "origin": "repeated_record_event_count_ambiguity",
+    "problem": "事件数与涉及记录数仍混用，重复记录在明细与摘要的归类不统一",
+    "change": "汇总从逐条判定明细计算并保留公式，增加两条记录组成一个重复事件的小例子",
+    "evidence": "runs/teacher-units-retest-v1/09_teacher and actual output workbooks",
+    "retest": "runs/teacher-detail-count-retest-v1",
+    "status": "targeted_final_checks_passed_see_teacher-render-recheck-v1"
+  },
+  {
+    "id": "TOOL-003",
+    "origin": "formula_text_visual_review",
+    "problem": "Cross-sheet formula text was fitted before dependent sheets were populated, clipping linked evidence.",
+    "change": "Fit rows after all sheets are populated and recalculated; replay unchanged data and formulas, followed by actual model readback.",
+    "evidence": "runs/teacher-detail-count-retest-v1/09_teacher/tools/workbook-004/previews/0.png",
+    "retest": "runs/teacher-render-recheck-v1",
+    "status": "cell_values_preserved_readback_and_readability_passed"
+  }
+]

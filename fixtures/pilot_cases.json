@@ -1,0 +1,72 @@
+[
+  {
+    "task_id": "pilot_occupation_001",
+    "stage": "01a_occupation",
+    "source_materials": [
+      {
+        "source_id": "synthetic_occupation_card",
+        "provenance": "人工编写的合成测试卡片，用于检查模板接口，不代表职业数据库原文",
+        "content": "采购专员收集供应商报价，比较长期成本、交期和产能，向采购负责人提交建议。当前工作情境为三年运输纸箱采购，包含标准和保温两种纸箱。候选供应商为匿名 A、B、C、D。"
+      }
+    ],
+    "constraints": {
+      "purpose": "合成模板小样本试跑，记录所有合成假设",
+      "synthesis_allowed": true,
+      "external_retrieval": false,
+      "allowed_reference_formats": ["pdf", "xlsx"],
+      "required_deliverable_formats": ["xlsx"],
+      "reference_file_count": 2,
+      "scope": "三年、四家供应商；计算成本净现值并结合服务条件推荐；所有必要实例值和规则允许合成，真实世界事实不得伪称查证"
+    }
+  },
+  {
+    "task_id": "pilot_skill_001",
+    "stage": "01b_skill",
+    "source_materials": [
+      {
+        "source_id": "synthetic_skill_extract",
+        "provenance": "人工合成技能卡片",
+        "content": "invoice_extract 接收可读发票明细，输出统一的供应商、发票号、日期、数量、单价、金额和币种。保留源行位置。"
+      },
+      {
+        "source_id": "synthetic_skill_reconcile",
+        "provenance": "人工合成技能卡片",
+        "content": "invoice_reconcile 接收规范化发票行、采购订单行和匹配规则，输出已匹配记录、差异记录和证据位置。"
+      },
+      {
+        "source_id": "synthetic_skill_report",
+        "provenance": "人工合成技能卡片",
+        "content": "exception_report 接收差异记录、处理权限和优先级规则，输出待办清单及财务经理审阅报告。"
+      }
+    ],
+    "constraints": {
+      "purpose": "合成模板小样本试跑",
+      "synthesis_allowed": true,
+      "external_retrieval": false,
+      "allowed_reference_formats": ["xlsx", "pdf"],
+      "required_deliverable_formats": ["xlsx"],
+      "reference_file_count": 2,
+      "scope": "一个月内至少六条发票记录及对应采购订单，存在可依据明确规则处理的差异；实例值和业务规则允许合成"
+    }
+  },
+  {
+    "task_id": "pilot_deliverable_001",
+    "stage": "01c_deliverable",
+    "source_materials": [
+      {
+        "source_id": "synthetic_report_excerpt",
+        "provenance": "人工合成交付物节选，未从真实网站抓取",
+        "content": "报告名称为月度客户支持质量复盘，读者为支持团队负责人。章节包含工单数量、响应与解决时长、SLA 违约分类、主要问题及改进建议。附录记录统计口径、排除规则和工单证据。节选不提供具体统计结果。"
+      }
+    ],
+    "constraints": {
+      "purpose": "合成模板小样本试跑",
+      "synthesis_allowed": true,
+      "external_retrieval": false,
+      "allowed_reference_formats": ["xlsx", "pdf"],
+      "required_deliverable_formats": ["pdf"],
+      "reference_file_count": 2,
+      "scope": "为一个月的匿名客服工单生成复盘，至少十条记录，提供时间口径、SLA 与排除规则；允许合成原始记录和规则，统计及建议留给求解者"
+    }
+  }
+]
