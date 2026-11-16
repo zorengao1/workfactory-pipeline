@@ -196,7 +196,7 @@ def _run_agent(stage, inputs, root, logs, config, writable, max_turns, resume_me
         messages=resume_messages
     available = TOOLS if writable else [t for t in TOOLS if t['function']['name'] in READ_TOOLS]
     if sandbox:
-        available=[*available,fn('execute_command','Execute bash in a fresh isolated WorkFactory container. /task contains only visible task files. Inputs are read-only for solvers. Use installed Python and LibreOffice for arbitrary document operations. No network or credentials are present.',{'command':S},['command'])]
+        available=[*[t for t in available if t['function']['name'] in {'list_files','read_text','write_text'}],fn('execute_command','Execute bash in a fresh isolated WorkFactory container. /task contains only visible task files. Inputs are read-only for solvers. Use installed Python and LibreOffice for arbitrary document operations. No network or credentials are present.',{'command':S},['command'])]
         messages[0]['content']+='\n可用 execute_command 在独立 Docker 内运行代码，支持多格式文件。只访问可见工作区。创建成果后重新打开实际文件检查。'
     available = [*available,fn('submit_result','Submit the final structured result and terminate this stage. Use after actual file operations and checks.',
         {'task_id':S,'status':{'type':'string','enum':['ok','blocked','rejected']},

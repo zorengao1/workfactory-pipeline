@@ -37,7 +37,7 @@
   },
   {
     "path": "tool_runtime.py",
-    "sha256": "450ee3b0563e2aa2c4258059f46739c419d174eb068d9e8c2e656c72e2775b85"
+    "sha256": "98735fec665b2211efaa9588b129ce3fbe265ac52e7eb3a4d98837e3c55284dc"
   },
   {
     "path": "export_trace.py",
@@ -253,7 +253,7 @@
   },
   {
     "path": "docker/Dockerfile",
-    "sha256": "aac78f61fa23f61d89661adfbd1e58b560caf6e18c087cad73bb58059e7d7b13"
+    "sha256": "768a54393cdd7139370b1d1c462559d6662e18cc8d4500bcb75ed8136cd9d7cd"
   },
   {
     "path": "docker/.dockerignore",
@@ -269,7 +269,7 @@
   },
   {
     "path": "README.md",
-    "sha256": "8f00faab10577d52b46f0415008e4cdd8b7a0484a05c2da40e0e1687ce1c9b49"
+    "sha256": "afa55d3e9b7571827ef2135d8168365dcfbbdef27924e96c9951fb7235be3721"
   },
   {
     "path": "service.py",

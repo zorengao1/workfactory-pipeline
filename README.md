@@ -124,3 +124,15 @@ trajectory.json 是教师候选轨迹。自动检查、人工验收与训练数�
 单元测试覆盖编排、工具访问边界、并发锁与后台任务配置。多格式文件已做本机生成与读回检查。后台独立进程验证不调用付费模型。本机首次验证被 macOS 拒绝访问 Documents。部署到 ~/workfactory-pipeline 后，launchd 在启动命令退出后独立完成测试脚本，退出码为 0。这验证了后台进程启动与文件访问，不代表付费模型全链路或高并发已通过。
 
 新版 Docker 全链路、MiMo Flash 成功轨迹、多模型高并发吞吐、自动故障恢复仍需实际验证。旧 runs 中的 XLSX 试跑结果不能作为这些能力的验收证据。
+
+## Linux 开发机独立批量运行
+
+控制器使用 Python 标准库。Docker 模式下，文件处理全部通过容器中的 execute_command 完成，不依赖 Codex、macOS、本机 Artifact Tool 或本机 Office。
+
+```bash
+python3 run_models.py --config /absolute/path/credentials.env --pipeline-config config/pipeline.json --output runs/batch-001
+```
+
+可在开发机已有的 tmux 或作业调度器中启动该命令。service.py 仅用于 macOS。Linux 的后台进程管理由开发机的作业系统负责。
+
+修改 task_workers 和 api_max_concurrency 设置每个模型的任务并发与请求并发。两组模型同时启动，组内按阶段顺序执行。先验证小批量，再依据平台限额和容器资源逐步增大。
