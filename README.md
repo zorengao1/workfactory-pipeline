@@ -22,6 +22,7 @@ GitHub 保存管线源码、提示词、JSON 契约、配置模板、测试、RE
 git clone https://github.com/zorengao1/workfactory-pipeline.git
 cd workfactory-pipeline
 docker build -t workfactory/runtime:v2 docker
+python3 scripts/check_environment.py
 ```
 
 多台开发机可以分别构建相同 Dockerfile。将来如需直接拉取预构建 WorkFactory 镜像，可单独发布到镜像仓库，并在 sandbox.image 指定版本。目前尚未发布该镜像。

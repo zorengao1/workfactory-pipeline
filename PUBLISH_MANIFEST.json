@@ -269,7 +269,7 @@
   },
   {
     "path": "README.md",
-    "sha256": "afa55d3e9b7571827ef2135d8168365dcfbbdef27924e96c9951fb7235be3721"
+    "sha256": "5b45031f271f2a1694317f0a9241e5fa7f9b0d082de3959988ed8e38bf28f13b"
   },
   {
     "path": "service.py",
@@ -278,5 +278,13 @@
   {
     "path": "tests/test_service.py",
     "sha256": "96d19ee7a013b3582119b26e7a87d688601bc2cab7e46a713986411f70a5319b"
+  },
+  {
+    "path": "scripts/check_environment.py",
+    "sha256": "cca7f64f8f10b5b9d5ab3f124208f123adcc2e748d52149c5efc7b4815c00e57"
+  },
+  {
+    "path": "scripts/container_smoke.py",
+    "sha256": "fa580966ca59d65e8009c13a5acefbb63731b885a15d47608b1a1b61c3cd5c59"
   }
 ]
