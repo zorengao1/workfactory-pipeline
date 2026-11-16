@@ -12,6 +12,22 @@
 
 目前新版 Docker 端到端与高并发压测尚未通过。代码检查通过不代表十条新轨迹已经生成。
 
+## 仓库与执行环境
+
+GitHub 保存管线源码、提示词、JSON 契约、配置模板、测试、README 和 docker/Dockerfile。Docker 镜像、容器、运行结果与密钥保存在运行机器上，不提交 GitHub。
+
+开发机克隆仓库后，执行 docker build。Docker 根据 Dockerfile 的 FROM 从 Docker Hub 拉取 Python 基础镜像，再安装文档处理依赖，构建本机 WorkFactory 镜像。Dockerfile 从 GitHub 获取，基础镜像从 Docker Hub 获取。
+
+```bash
+git clone https://github.com/zorengao1/workfactory-pipeline.git
+cd workfactory-pipeline
+docker build -t workfactory/runtime:v2 docker
+```
+
+多台开发机可以分别构建相同 Dockerfile。将来如需直接拉取预构建 WorkFactory 镜像，可单独发布到镜像仓库，并在 sandbox.image 指定版本。目前尚未发布该镜像。
+
+该组织方式参考 Terminal-Bench 的代码、任务配置与环境构建文件分离。当前仓库保留自己的任务契约与编排入口，未实现 Terminal-Bench 格式兼容。
+
 ## 安装与准备
 
 需要 Python 3.10 或更新版本、Docker Desktop 和可调用的模型接口。后台入口需要 macOS 登录会话。

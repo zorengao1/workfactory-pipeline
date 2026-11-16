@@ -109,7 +109,7 @@
   },
   {
     "path": ".gitignore",
-    "sha256": "f0ca4fba60aa6d589e4f8d612922580058886bc4d7c2d29450c1c27288b9ab71"
+    "sha256": "1f5f9897d15af77c55191dec1cf161e426545e37d4cfaca674d17f2849698412"
   },
   {
     "path": "prompts/01b_skill.txt",
@@ -269,7 +269,7 @@
   },
   {
     "path": "README.md",
-    "sha256": "8d504538e23034d8c6f7fdfceba1a783f298d160ce97c4e779e50cc463a3527c"
+    "sha256": "8f00faab10577d52b46f0415008e4cdd8b7a0484a05c2da40e0e1687ce1c9b49"
   },
   {
     "path": "service.py",
