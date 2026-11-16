@@ -1,5 +1,9 @@
 [
   {
+    "path": ".gitattributes",
+    "sha256": "b0c2436118ce86cc8dd12f0e0b1db4252e6691a4969c37f941a3b62b5911fc9f"
+  },
+  {
     "path": ".gitignore",
     "sha256": "e405aea83df3400341604bc0027519b03647ac22680f8fcefeb3d30465de5862"
   },
@@ -289,7 +293,7 @@
   },
   {
     "path": "source_pools.py",
-    "sha256": "85af5d12534fe5f47f7c385c47b534e667266a2f5f70e95c41a0a44cbd55b43b"
+    "sha256": "64effcae0817d340087a91b4bb7ed1a129249d10741177805c97f19224d6b9a9"
   },
   {
     "path": "tests/test_api_gate.py",

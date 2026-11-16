@@ -166,7 +166,8 @@ class SOCParser(HTMLParser):
         if not match:return
         code,title=match.groups()
         self.records[code]={'code':code,'title':title,'description':''.join(record['description']).strip(),
-            'parent_code':record['parent_code'],'major_code':code[:2]+'-0000','url':SOC_URL}
+            'parent_code':record['parent_code'] or (None if code.endswith('-0000') else code[:2]+'-0000'),
+            'major_code':code[:2]+'-0000','url':SOC_URL}
 
 
 def fetch_soc(import_html=None):
