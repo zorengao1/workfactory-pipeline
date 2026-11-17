@@ -4,9 +4,9 @@
   "soc_records": 1447,
   "soc_detailed_occupations": 867,
   "occupation_task_statements": 18838,
-  "skill_repositories": 40,
-  "skill_documents": 96,
-  "skills_eligible_for_composition": 91,
+  "skill_repositories": 8,
+  "skill_documents": 640,
+  "skills_eligible_for_composition": 639,
   "case_count": 1040,
   "occupation_cases": 1016,
   "skill_cases": 24,
@@ -38,8 +38,8 @@
   "seed": 42,
   "sampling": "Round-robin SOC major groups; TF-IDF related skill documents followed by LLM I/O compatibility validation. Not paper frequency replication.",
   "pending": [
-    "Real-deliverable source pool",
-    "Dynamic profession-context search agent",
-    "Learned semantic skill retrieval; current candidates use TF-IDF and LLM validation"
+    "Occupation-driven online skill discovery and matching cache",
+    "Source-pool coverage sampling",
+    "Full-scale retrieval and skill relevance validation"
   ]
 }

@@ -7,10 +7,11 @@ WorkFactory 管线本地复现
 固定文件工具另提供 XLSX、PDF、DOCX、PPTX、CSV、TSV、JSON 和文本读写。
 
 重要状态
-代码已加入多格式与并发支持，尚未完成新版 Docker 端到端验收。
-真实搜索服务未选定，配置为 external_retrieval=true 时会明确停止。
-config/cases.json 的五条内容仍是合成示例，替换为真实来源清单后再扩大任务池。
-导出轨迹是原始候选，长尾拒绝采样与最终训练 token 掩码尚未完成。
+当前完整说明见 README.md，逐项实现状态见 docs/IMPLEMENTATION_STATUS.md。
+Docker 运行环境及 GPT 三条混合来源任务已完成实际执行，候选轨迹仍待完整人工验收和训练整理。
+真实输入已接入 BLS、O*NET、skills CLI 和 GPT 原生联网检索。默认 source_cases 使用来源池生成的清单。
+格式规划已加入业务理由与 format_fitness 审核，本次提示词修改通过本地测试，尚未用新批次验证效果。
+长尾拒绝采样、训练 token 掩码、按职业在线技能发现、稳定高并发等待完成项见实现状态清单。
 
 入口
 batch_generate.py 执行单模型的一批任务。

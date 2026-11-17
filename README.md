@@ -8,6 +8,8 @@
 
 模型、任务并发、API 并发、阶段模型和容器资源通过配置控制。文件数量和格式由工作需要决定。环境可包含 PDF、DOCX、PPTX、XLSX、CSV、JSON 等实际可处理的文件。
 
+当前实现、已验证范围及未完成项见 [实现状态清单](docs/IMPLEMENTATION_STATUS.md)。
+
 ## 原素材入口
 
 默认输入已改为 SOC、O*NET 和 skills.sh 来源生成的清单。config/cases.json 等手写情境仅保留为测试样例，不作为默认来源。
@@ -131,9 +133,13 @@ API 调用入口为 pilot.py，限流在 api_gate.py，阶段编排在 batch_gen
 
 ## 当前验证与待完成部分
 
-Dockerfile 已成功构建，容器内四种文档格式的生成、读回与输入只读检查通过。已有三条 DeepSeek 多格式任务完成环境与教师候选轨迹生成，尚未统一完成人工验收。
+Dockerfile 已成功构建，容器内文档生成、读回与输入只读检查通过。已有 DeepSeek 候选轨迹及三条 GPT 混合来源联网候选轨迹完成执行，尚未统一完成人工验收和训练数据整理。
 
-真实职业与技能来源已经接入。职业上下文的动态网页搜索、真实专业交付物来源池、长轨迹拒绝采样、训练 token 掩码、跨机器调度和高并发压力测试仍待完成。external_retrieval=true 时当前会明确报错，不自动替换检索服务。
+BLS、O*NET、skills CLI、GPT 原生 web_search 和真实交付物下载解析已接入。external_retrieval=true 需要显式配置 responses_web_search 后端及 Responses 接口模式，缺少配置时明确报错。
+
+文件格式规划现要求按用途、受众和使用方式说明理由，构建审核增加必查 format_fitness，禁止无业务依据地统一生成 MD，也不强制凑格式或文件数。这一修改通过本地测试，尚未用新批次验证实际效果。旧批次使用旧提示词，历史结果不回写。
+
+按职业在线发现与缓存技能、覆盖采样控制、程序证据包加单轮审核、独立成果验收、长轨迹拒绝采样、训练 token 掩码、细粒度恢复、跨机器调度和高并发压力测试仍待完成。逐项状态见 [实现状态清单](docs/IMPLEMENTATION_STATUS.md)。
 
 GitHub 保存源码、配置、提示词、测试、说明、Dockerfile 和小型固定来源资源，不保存 Docker 镜像或容器。开发机从 Docker Hub 拉取基础镜像并按 Dockerfile 构建独立环境。
 

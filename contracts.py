@@ -78,7 +78,7 @@ STAGES = {
 }
 REQUIRED_CHECKS = {
     "02_intent_review": {"professional_fit", "coherence", "feasibility", "source_support"},
-    "05_construction_review": {"file_match", "coverage", "request_consistency", "no_answer_leakage"},
+    "05_construction_review": {"file_match", "coverage", "request_consistency", "no_answer_leakage", "format_fitness"},
     "08_preservation_review": {"objective", "operations", "deliverables", "file_structure", "no_answer_leakage"},
 }
 TOOL_STAGES = set(STAGES) - {"01a_occupation", "01b_skill", "01c_deliverable", "02_intent_review", "03_plan"}
