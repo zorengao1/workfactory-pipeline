@@ -1,7 +1,7 @@
 import json
 import unittest
-from source_retrieval import source_urls, parse_research
-from responses_adapter import request_payload
+from workfactory.sources.retrieval import source_urls, parse_research
+from workfactory.models.responses import request_payload
 from scripts.prepare_mixed_inputs import match_skills
 
 class MixedInputTests(unittest.TestCase):

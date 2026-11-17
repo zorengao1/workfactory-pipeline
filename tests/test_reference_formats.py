@@ -1,7 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
-from environment_pilot import checks
+from workfactory.pipeline.environment import checks
 
 class ReferenceFormatTests(unittest.TestCase):
     def test_encoding_labels_do_not_reject_valid_reference_files(self):

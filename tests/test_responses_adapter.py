@@ -1,5 +1,5 @@
 import unittest
-from responses_adapter import request_payload, normalize
+from workfactory.models.responses import request_payload, normalize
 
 class ResponsesTests(unittest.TestCase):
     def test_reasoning_and_tool_results_replay(self):

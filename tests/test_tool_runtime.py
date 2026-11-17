@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 import json
 
-from tool_runtime import Broker, run_agent
+from workfactory.runtime.agent import Broker, run_agent
 
 
 class FileBoundaryTests(unittest.TestCase):
@@ -41,7 +41,7 @@ class FileBoundaryTests(unittest.TestCase):
             response={'choices':[{'finish_reason':'tool_calls','message':{'role':'assistant','content':'not the submitted result',
                 'tool_calls':[{'id':'submit1','type':'function','function':{'name':'submit_result','arguments':json.dumps(parsed)}}]}}]}
             inputs={'task_id':'t','environment':{'user_request':'task','reference_files':[],'resources':{}},'workspace':{}}
-            with patch('tool_runtime.complete',return_value=response):
+            with patch('workfactory.runtime.agent.complete',return_value=response):
                 result=run_agent('06_probe',inputs,root,base/'logs',{'OPENAI_MODEL':'test','OPENAI_API_KEY':'secret'})
             self.assertEqual(result,parsed)
             self.assertEqual(json.loads((base/'logs/submission.json').read_text())['method'],'submit_result')
@@ -57,7 +57,7 @@ class FileBoundaryTests(unittest.TestCase):
                     'tool_calls':[{'id':call_id,'type':'function','function':{'name':name,'arguments':json.dumps(args)}}]}}]}
             responses=[response('submit_result',parsed,'early'),response('read_workbook',{'path':'outputs/report.xlsx'},'read'),response('submit_result',parsed,'final')]
             inputs={'task_id':'t','environment':{'user_request':'task','reference_files':[],'resources':{}},'workspace':{}}
-            with patch('tool_runtime.complete',side_effect=responses),patch.object(Broker,'workbook',return_value={'inspection':'test'}):
+            with patch('workfactory.runtime.agent.complete',side_effect=responses),patch.object(Broker,'workbook',return_value={'inspection':'test'}):
                 result=run_agent('09_teacher',inputs,root,base/'logs',{'OPENAI_MODEL':'test','OPENAI_API_KEY':'secret'},('outputs',))
             self.assertEqual(result,parsed)
             self.assertIn('must be reopened',json.loads((base/'logs/00-tool-early.json').read_text())['error'])
@@ -67,7 +67,7 @@ class FileBoundaryTests(unittest.TestCase):
             base=Path(tmp);root=base/'task';root.mkdir()
             b=Broker(root,base/'logs',('outputs',))
             sheets=[{'name':'Data','rows':[['count'],[8]],'formats':[{'range':'A2','format':'wrap'}]}]
-            with patch('tool_runtime.subprocess.run') as process:
+            with patch('workfactory.runtime.agent.subprocess.run') as process:
                 with self.assertRaisesRegex(ValueError,'unsupported numeric/date format'):
                     b.call('create_workbook',{'path':'outputs/test.xlsx','sheets_json':json.dumps(sheets)})
                 process.assert_not_called()
@@ -79,7 +79,7 @@ class FileBoundaryTests(unittest.TestCase):
             value={'task_id':'t','status':'blocked','result':None,'issues':['missing input']}
             response={'choices':[{'finish_reason':'stop','message':{'role':'assistant','content':json.dumps(value)}}]}
             inputs={'task_id':'t','environment':{'user_request':'task','reference_files':[],'resources':{}},'workspace':{}}
-            with patch('tool_runtime.complete',return_value=response):
+            with patch('workfactory.runtime.agent.complete',return_value=response):
                 result=run_agent('06_probe',inputs,root,base/'logs',{'OPENAI_MODEL':'test','OPENAI_API_KEY':'secret'})
             self.assertIsNone(result)
             self.assertFalse(json.loads((base/'logs/validation.json').read_text())['pass'])

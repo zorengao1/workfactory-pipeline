@@ -1,7 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
-from service import identity, make_job
+from workfactory.operations.service import identity, make_job
 
 
 class ServiceTests(unittest.TestCase):

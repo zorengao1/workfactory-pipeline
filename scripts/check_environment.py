@@ -1,4 +1,5 @@
 """Verify Docker isolation and multi-format I/O without calling any model API."""
+import argparse
 import json
 import sys
 import tempfile
@@ -6,10 +7,11 @@ from pathlib import Path
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from docker_runtime import DockerRuntime
+from workfactory.runtime.docker import DockerRuntime
 
 
 def main():
+    argparse.ArgumentParser(description=__doc__).parse_args()
     with tempfile.TemporaryDirectory(prefix='workfactory-check-') as tmp:
         root=Path(tmp)
         (root/'inputs').mkdir()

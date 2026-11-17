@@ -3,12 +3,12 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from batch_generate import cases, run_case, StageRejected, text_stage, agent
-from pilot import read_json, save
+from workfactory.pipeline.batch import cases, run_case, StageRejected, text_stage, agent
+from workfactory.models.client import read_json, save
 
 
 def example_cases():
-    from pipeline_config import load_policy
+    from workfactory.core.config import load_policy
     policy=load_policy();policy['source_cases']='config/cases.json'
     return cases(policy)
 
@@ -19,7 +19,7 @@ class BatchTests(unittest.TestCase):
             root=Path(td);path=root/'03_plan-retry-01/03_plan';path.mkdir(parents=True)
             save(path/'validation.json',{'format_and_contract_pass':True,'status':'ok'})
             save(path/'parsed.json',{'result':{'fixture':'saved plan'}})
-            with patch('batch_generate.run_stage') as run:
+            with patch('workfactory.pipeline.batch.run_stage') as run:
                 self.assertEqual(text_stage('03_plan',{},root,{}),{'fixture':'saved plan'})
             run.assert_not_called()
 
@@ -28,7 +28,7 @@ class BatchTests(unittest.TestCase):
             root=Path(td);stage=root/'06_probe';stage.mkdir()
             history=[{'role':'user','content':'original visible task'}]
             save(stage/'05-request.json',{'messages':history})
-            with patch('batch_generate.run_agent',return_value={'status':'ok','result':{}}) as run:
+            with patch('workfactory.pipeline.batch.run_agent',return_value={'status':'ok','result':{}}) as run:
                 agent('06_probe',{},root,stage,{},('outputs',))
             self.assertEqual(run.call_args.kwargs['resume_messages'],history)
             self.assertEqual(run.call_args.args[3],root/'06_probe-resume-01')
@@ -45,7 +45,7 @@ class BatchTests(unittest.TestCase):
     def test_success_is_not_repeated_and_failed_attempt_is_preserved(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td);case=example_cases()[0];config={'OPENAI_MODEL':'test','OPENAI_API_KEY':'secret'}
-            with patch('batch_generate.attempt',side_effect=[StageRejected('bad plan'),'candidate.json']) as stage:
+            with patch('workfactory.pipeline.batch.attempt',side_effect=[StageRejected('bad plan'),'candidate.json']) as stage:
                 run_case(case,root,config)
                 run_case(case,root,config)
             self.assertEqual(stage.call_count,2)
@@ -56,7 +56,7 @@ class BatchTests(unittest.TestCase):
     def test_transport_failure_stops_case_and_redacts_secret(self):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td);case=example_cases()[0];config={'OPENAI_MODEL':'test','OPENAI_API_KEY':'secret'}
-            with patch('batch_generate.attempt',side_effect=RuntimeError('secret HTTP 429')) as stage:
+            with patch('workfactory.pipeline.batch.attempt',side_effect=RuntimeError('secret HTTP 429')) as stage:
                 with self.assertRaises(RuntimeError):run_case(case,root,config)
             self.assertEqual(stage.call_count,1)
             text=(root/case['task_id']/'status.json').read_text()

@@ -7,8 +7,8 @@ import sys
 from collections import Counter
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from contracts import ROOT
-from pilot import save
+from workfactory.core.contracts import ROOT
+from workfactory.models.client import save
 
 
 def match_skills(occupation,skills,count=3):

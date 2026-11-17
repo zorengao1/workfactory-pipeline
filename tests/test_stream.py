@@ -2,7 +2,7 @@ import io
 import json
 import unittest
 from unittest.mock import patch
-from pilot import collect_stream, complete, IncompleteStreamError
+from workfactory.models.client import collect_stream, complete, IncompleteStreamError
 
 
 class StreamTests(unittest.TestCase):
@@ -23,7 +23,7 @@ class StreamTests(unittest.TestCase):
     def test_incomplete_response_retries_identical_payload(self):
         config={'TRANSPORT_ATTEMPTS':'2','OPENAI_API_KEY':'test'}
         messages=[{'role':'user','content':'task'}]
-        with patch('pilot.complete_once',side_effect=[IncompleteStreamError('truncated'),{'ok':True}]) as call, patch('pilot.time.sleep'):
+        with patch('workfactory.models.client.complete_once',side_effect=[IncompleteStreamError('truncated'),{'ok':True}]) as call, patch('workfactory.models.client.time.sleep'):
             self.assertEqual(complete(config,messages,100),{'ok':True})
         self.assertEqual(call.call_count,2)
         self.assertEqual(call.call_args_list[0],call.call_args_list[1])

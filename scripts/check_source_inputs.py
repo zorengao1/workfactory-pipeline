@@ -5,9 +5,9 @@ import sys
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from pipeline_config import load_policy,source_cases
-from pilot import load_config,save
-from batch_generate import text_stage
+from workfactory.core.config import load_policy,source_cases
+from workfactory.models.client import load_config,save
+from workfactory.pipeline.batch import text_stage
 
 
 def main():

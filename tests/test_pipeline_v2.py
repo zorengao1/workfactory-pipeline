@@ -3,9 +3,9 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch, Mock
-from batch_generate import materialize, StageRejected
-from docker_runtime import DockerRuntime
-from environment_pilot import checks
+from workfactory.pipeline.batch import materialize, StageRejected
+from workfactory.runtime.docker import DockerRuntime
+from workfactory.pipeline.environment import checks
 
 
 class PipelineV2Tests(unittest.TestCase):
@@ -19,7 +19,7 @@ class PipelineV2Tests(unittest.TestCase):
                     if 'materialization-00' in str(workspace):raise StageRejected('bad artifact')
                     (workspace/'REQUEST.txt').write_text('task')
                 return {'status':'ok','result':{'verdict':'pass'}}
-            with patch('batch_generate.agent',side_effect=agent):
+            with patch('workfactory.pipeline.batch.agent',side_effect=agent):
                 result=materialize({'task_id':'test','constraints':{}},plan,root,{})
             self.assertEqual(result.parent.name,'materialization-01')
             self.assertTrue((root/'materialization-00/rejected.json').exists())
@@ -36,7 +36,7 @@ class PipelineV2Tests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             root=Path(td);(root/'REQUEST.txt').write_text('visible')
             runtime=DockerRuntime(root,('outputs',),{'image':'workfactory/runtime:test'},root/'logs')
-            with patch('docker_runtime.subprocess.run',return_value=Mock(returncode=0,stdout='',stderr='')) as run:
+            with patch('workfactory.runtime.docker.subprocess.run',return_value=Mock(returncode=0,stdout='',stderr='')) as run:
                 runtime.execute('ls /task');runtime.close()
             command=run.call_args_list[0].args[0]
             self.assertIn('none',command)
