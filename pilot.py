@@ -86,6 +86,9 @@ def collect_stream(response, log_path=None, secret=''):
 
 
 def complete_once(config, messages, max_tokens, tool_definitions=None):
+    if config.get('OPENAI_API_MODE') == 'responses':
+        from responses_adapter import complete_responses
+        return complete_responses(config, messages, max_tokens, tool_definitions)
     payload = {"model": config["OPENAI_MODEL"], "messages": messages, "max_tokens": max_tokens}
     streaming=config.get('STREAM_RESPONSES')=='1'
     if streaming:payload.update(stream=True,stream_options={'include_usage':True})

@@ -120,3 +120,7 @@ Dockerfile 已成功构建，容器内四种文档格式的生成、读回与输
 真实职业与技能来源已经接入。职业上下文的动态网页搜索、真实专业交付物来源池、长轨迹拒绝采样、训练 token 掩码、跨机器调度和高并发压力测试仍待完成。external_retrieval=true 时当前会明确报错，不自动替换检索服务。
 
 GitHub 保存源码、配置、提示词、测试、说明、Dockerfile 和小型固定来源资源，不保存 Docker 镜像或容器。开发机从 Docker Hub 拉取基础镜像并按 Dockerfile 构建独立环境。
+
+## Responses 接口
+
+在外部凭据文件设置 `OPENAI_API_MODE=responses` 可使用 Responses 接口。适配器保留推理项、函数调用与工具结果，按完整历史恢复执行。可选 `REASONING_EFFORT` 指定服务支持的推理强度，不默认关闭推理。DeepSeek 和 MiMo 仍使用原 Chat Completions 接口。Responses 当前使用非流式响应，完整响应落盘后进入工具执行。
