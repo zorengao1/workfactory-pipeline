@@ -11,7 +11,8 @@ from batch_report import report
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('root',type=Path);a=p.parse_args();root=a.root.resolve()
     while True:
-        audit(root)
+        pricing=root/'pricing.json'
+        audit(root,json.loads(pricing.read_text()) if pricing.exists() else None)
         states=[json.loads(s.read_text()) for s in root.glob('*/*/status.json') if (s.parent/'seed.json').exists()]
         expected=sum(len(json.loads(p.read_text())) for p in root.glob('*/seeds.json'))
         if len(states)==expected and states and all(x.get('state') in ('candidate_complete','needs_review','error') for x in states):
@@ -22,5 +23,5 @@ if __name__=='__main__':
                 from datetime import datetime,timezone
                 status['updated_at']=datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
                 p.write_text(json.dumps(status,ensure_ascii=False,indent=2)+'\n')
-            report(root);audit(root);break
+            report(root);audit(root,json.loads(pricing.read_text()) if pricing.exists() else None);break
         time.sleep(30)
