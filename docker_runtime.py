@@ -27,6 +27,10 @@ class DockerRuntime:
             if value=='REQUEST.txt':p.touch(exist_ok=True)
             else:p.mkdir(parents=True,exist_ok=True)
             command+=['--mount',f'type=bind,src={p},dst=/task/{value}']
+        if self.settings.get('construction_sources'):
+            source=Path(self.settings['construction_sources']).resolve()
+            if not source.is_dir():raise ValueError('Missing construction source directory')
+            command+=['--mount',f'type=bind,src={source},dst=/sources,readonly']
         command+=[self.settings['image']]
         subprocess.run(command,capture_output=True,text=True,check=True)
         self.started=True

@@ -1,6 +1,6 @@
 """Fetch auditable source snapshots and build occupation/skill intent inputs.
 
-Only public documents are read. Skill instructions are data, never installed or run.
+Only public documents are read. Skill instructions are data, never activated or run.
 Missing sources fail explicitly; no alternative provider is selected automatically.
 """
 import argparse
@@ -275,12 +275,27 @@ def main():
     settings=json.loads((ROOT/'config/source-pools.json').read_text())
     p=argparse.ArgumentParser(description=__doc__);sub=p.add_subparsers(dest='action',required=True)
     a=sub.add_parser('fetch-onet');a.add_argument('--version',default=settings['onet_version'])
-    a=sub.add_parser('fetch-skills');a.add_argument('--limit',type=int,default=settings['skills_limit']);a.add_argument('--per-repo',type=int,default=settings['skills_per_repository'])
+    a=sub.add_parser('fetch-skills')
+    a.add_argument('--backend',choices=['cli','html'],default=settings.get('skills_backend','html'))
+    a.add_argument('--limit',type=int,default=settings['skills_limit'],help='HTML backend only')
+    a.add_argument('--per-repo',type=int,default=settings['skills_per_repository'],help='HTML backend only')
+    a.add_argument('--repository',action='append',help='CLI GitHub owner/repository; repeat for multiple repositories')
+    a.add_argument('--cli',default='skills');a.add_argument('--refresh',action='store_true')
+    a.add_argument('--output',type=Path,default=DATA/'skills.json')
     a=sub.add_parser('fetch-soc');a.add_argument('--import-html')
     a=sub.add_parser('build');a.add_argument('--occupations',type=int,default=settings['occupation_limit']);a.add_argument('--skill-cases',type=int,default=settings['skill_case_count']);a.add_argument('--seed',type=int,default=settings['sampling_seed'])
     args=p.parse_args()
     if args.action=='fetch-onet':print('Occupation records',len(fetch_onet(args.version)))
-    elif args.action=='fetch-skills':print('Skill documents',len(fetch_skills(args.limit,args.per_repo)))
+    elif args.action=='fetch-skills':
+        if args.backend=='cli':
+            from skills_cli_source import collect_skills
+            result=collect_skills(args.repository or settings.get('skills_repositories',[]),DATA,args.output,
+                args.cli,settings.get('skills_cli_version','1.8.1'),args.refresh)
+        else:
+            if args.refresh or args.repository:raise ValueError('refresh and repository options require CLI backend')
+            result=fetch_skills(args.limit,args.per_repo)
+            if args.output!=DATA/'skills.json':save(args.output,result)
+        print('Skill documents',len(result))
     elif args.action=='fetch-soc':print('SOC records',len(fetch_soc(args.import_html)))
     else:print(json.dumps(build_cases(args.occupations,args.skill_cases,args.seed),indent=2))
 

@@ -136,7 +136,8 @@ def input_errors(stage, data):
     if type(data) is not dict:
         return ["input must be an object"]
     errors = ["missing input " + k for k in expected - data.keys()]
-    errors += ["unexpected input " + k for k in data.keys() - expected]
+    allowed = expected | ({"source_materials"} if stage == "03_plan" else set())
+    errors += ["unexpected input " + k for k in data.keys() - allowed]
     if not isinstance(data.get("task_id"), str) or not data.get("task_id"):
         errors.append("task_id must be a nonempty string")
     if stage in {"06_probe", "09_teacher", "10_pairwise_review"} and "environment" in data:

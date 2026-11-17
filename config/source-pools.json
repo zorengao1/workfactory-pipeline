@@ -15,5 +15,17 @@
   "skills_per_repository": 6,
   "occupation_limit": 0,
   "skill_case_count": 24,
-  "sampling_seed": 42
+  "sampling_seed": 42,
+  "skills_backend": "cli",
+  "skills_cli_version": "1.8.1",
+  "skills_repositories": [
+    "anthropics/skills",
+    "anthropics/knowledge-work-plugins",
+    "anthropics/financial-services",
+    "anthropics/claude-for-legal",
+    "anthropics/healthcare",
+    "anthropics/life-sciences",
+    "anthropics/k12-teacher-skills",
+    "k-dense-ai/scientific-agent-skills"
+  ]
 }

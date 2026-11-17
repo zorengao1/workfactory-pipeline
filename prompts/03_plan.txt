@@ -2,7 +2,7 @@
 将通过审查的意图展开为信息关系图、用户请求和文件构建计划。
 
 【输入】
-读取 task_id、intent、constraints。constraints 指定合成权限、文件格式、外部资源和工具条件。
+读取 task_id、intent、constraints，以及可选的 source_materials 原始来源正文。真实来源只支持其中明确可见的事实，保持机构和时间范围一致。constraints 指定合成权限、文件格式、外部资源和工具条件。
 
 【执行规则】
 参考文件数量与格式由信息角色、专业场景及实际工具能力决定。没有明确数量约束时不得固定两份或为了接近统计均值拆分材料。空的 allowed_reference_formats 表示不限定格式。可组合数据表、PDF 报价、DOCX 条款、PPTX 背景资料等，但只安排有业务作用的文件。交付物格式按工作目标规划。

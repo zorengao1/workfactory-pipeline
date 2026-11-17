@@ -179,7 +179,9 @@ class Broker:
 
 def run_agent(stage, inputs, root, logs, config, writable=(), max_turns=18, resume_messages=None, reuse_resume_readbacks=True):
     from docker_runtime import DockerRuntime
-    settings=config.get('_POLICY',{}).get('sandbox',{})
+    settings=dict(config.get('_POLICY',{}).get('sandbox',{}))
+    if stage=='04_build' and config.get('_CONSTRUCTION_SOURCES'):
+        settings['construction_sources']=config['_CONSTRUCTION_SOURCES']
     sandbox=DockerRuntime(root,writable,settings,logs) if settings.get('backend')=='docker' else None
     try:
         return _run_agent(stage,inputs,root,logs,config,writable,max_turns,resume_messages,reuse_resume_readbacks,sandbox)

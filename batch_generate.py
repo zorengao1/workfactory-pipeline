@@ -92,15 +92,27 @@ def materialize(case, plan, folder, config):
     """Retry construction under the SAME plan; retain every failed build."""
     retries=config.get('_POLICY',{}).get('initial_build_retries',3)
     for index in range(retries+1):
-        step=folder/f'materialization-{index:02d}'
+        step=folder/f'materialization-sources-{index:02d}' if case.get('source_metadata',{}).get('mixed_inputs') else folder/f'materialization-{index:02d}'
         step.mkdir(exist_ok=True)
         if (step/'rejected.json').exists():continue
         root=step/'environment';root.mkdir(exist_ok=True)
+        sources=step/'construction_sources';sources.mkdir(exist_ok=True)
+        manifest=[]
+        for i,material in enumerate(case.get('source_materials',[])):
+            name=f'source-{i:02d}.json';save(sources/name,material)
+            entry={'source_id':material['source_id'],'metadata_and_text':'/sources/'+name}
+            snapshot=material.get('snapshot')
+            if snapshot and Path(snapshot).is_file():
+                raw=Path(snapshot);suffix='.pdf' if raw.read_bytes()[:5]==b'%PDF' else raw.suffix or '.bin'
+                target=sources/(f'source-{i:02d}'+suffix);shutil.copyfile(raw,target)
+                entry['original_file']='/sources/'+target.name
+            manifest.append(entry)
+        build_config={**config,'_CONSTRUCTION_SOURCES':str(sources.resolve())}
         try:
             agent('04_build',{'task_id':case['task_id'],'plan':plan,'constraints':case['constraints'],
                 'workspace':{'root':'/task','writable_paths':['inputs','REQUEST.txt'],
-                             'reference_directory':'/task/inputs','request_path':'/task/REQUEST.txt'}},
-                  root,step/'04_build',config,('inputs','REQUEST.txt'))
+                             'reference_directory':'/task/inputs','request_path':'/task/REQUEST.txt','construction_source_manifest':manifest,'construction_sources_policy':'Read-only /sources is only available to the builder. Read actual source JSON or original files before reuse/adapt. It is not copied to solver workspaces.'}},
+                  root,step/'04_build',build_config,('inputs','REQUEST.txt'))
             program=checks(root,plan);save(step/'program_checks.json',program)
             if not program['exact_file_set'] or not program['nonempty'] or not program['format_match']:
                 raise StageRejected('Construction file checks failed')
@@ -121,7 +133,7 @@ def attempt(case, folder, config):
         elif stage=='02_intent_review':
             review=text_stage(stage,{**base,'intent':intent},folder,config)
             if review['verdict']!='pass':raise StageRejected('intent review failed')
-        else:plan=text_stage(stage,{'task_id':case['task_id'],'intent':intent,'constraints':case['constraints']},folder,config)
+        else:plan=text_stage(stage,{'task_id':case['task_id'],'intent':intent,'source_materials':case['source_materials'],'constraints':case['constraints']},folder,config)
     save(folder/'initial_plan.json',plan)
     root=materialize(case,plan,folder,config)
     initial_root=root
@@ -180,6 +192,13 @@ def run_case(case, model_dir, config, max_attempts=3):
         raise ValueError('Task configuration changed; use a new output directory to preserve prior attempts')
     if (dest/'status.json').exists() and read_json(dest/'status.json').get('state')=='candidate_complete':return
     save(dest/'seed.json',case)
+    if config.get('_POLICY',{}).get('external_retrieval'):
+        from source_retrieval import enrich_case
+        update(dest,state='retrieving_sources',model=config['OPENAI_MODEL'],pid=os.getpid())
+        try:case=enrich_case(case,dest/'source_retrieval',config)
+        except Exception as exc:
+            update(dest,state='error',reason=str(exc).replace(config['OPENAI_API_KEY'],'[REDACTED]'))
+            raise
     for n in range(1,max_attempts+1):
         folder=dest/f'attempt-{n:02d}'
         if folder.exists():
@@ -212,7 +231,8 @@ def main():
     config['API_LIMIT_SCOPE']=policy.get('api_limit_scope','model')
     batch_cases=cases(policy)
     if policy['external_retrieval']:
-        raise ValueError('Retrieval backend must be configured and verified before enabling external_retrieval')
+        if policy.get('retrieval',{}).get('backend')!='responses_web_search' or config.get('OPENAI_API_MODE')!='responses':
+            raise ValueError('Configure Responses web search before enabling external_retrieval')
     config.setdefault('MAX_OUTPUT_TOKENS','65536')
     config.setdefault('STREAM_RESPONSES','1')
     config.setdefault('TRANSPORT_ATTEMPTS','3')

@@ -1,5 +1,7 @@
 """Responses transport with replayable reasoning and function-call history."""
 import json
+import time
+from datetime import datetime, timezone
 import urllib.request
 import urllib.error
 
@@ -17,6 +19,12 @@ def request_payload(config, messages, max_tokens, tools):
              'store':False,'include':['reasoning.encrypted_content']}
     if tools is not None:
         payload['tools']=[{'type':'function',**tool['function'],'strict':False} for tool in tools]
+    if config.get('NATIVE_WEB_SEARCH') == '1':
+        payload.setdefault('tools', []).append({'type':'web_search','search_context_size':'high'})
+        payload['include'].append('web_search_call.action.sources')
+        payload['tool_choice']='required'
+        payload['temperature']=1.0
+        payload['stream']=False
     if config.get('REASONING_EFFORT'):
         payload['reasoning']={'effort':config['REASONING_EFFORT']}
     return payload
@@ -48,6 +56,7 @@ def complete_responses(config,messages,max_tokens,tools):
     payload=request_payload(config,messages,max_tokens,tools)
     request=urllib.request.Request(config['OPENAI_BASE_URL'].rstrip('/')+'/responses',
         data=json.dumps(payload).encode(),headers={'Content-Type':'application/json','Authorization':'Bearer '+config['OPENAI_API_KEY']})
+    started=time.monotonic();started_at=datetime.now(timezone.utc).isoformat()
     try:
         with urllib.request.build_opener(NoRedirect()).open(request,timeout=600) as response:
             result=json.load(response)
@@ -56,4 +65,6 @@ def complete_responses(config,messages,max_tokens,tools):
         error=TransientAPIError if exc.code in {429,500,502,503,504} else RuntimeError
         raise error('Responses HTTP '+str(exc.code)+' '+body) from None
     result=json.loads(json.dumps(result).replace(config['OPENAI_API_KEY'],'[REDACTED]'))
-    return normalize(result)
+    normalized=normalize(result)
+    normalized['request_metrics']={'started_at':started_at,'finished_at':datetime.now(timezone.utc).isoformat(),'elapsed_seconds':round(time.monotonic()-started,3),'api':'responses','web_search_calls':sum(x.get('type')=='web_search_call' for x in result.get('output',[]))}
+    return normalized
