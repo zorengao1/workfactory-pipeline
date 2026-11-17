@@ -27,6 +27,9 @@ def audit(root,pricing=None):
             for item in r.get('responses_raw',{}).get('output',[]):
                 if item.get('type')=='web_search_call':
                     current['web_tool_calls']+=1;current['web_action_'+item.get('action',{}).get('type','unknown')]+=1
+            current['api_reported_web_requests']+=r.get('responses_raw',{}).get('tool_usage',{}).get('web_search',{}).get('num_requests',0)
+            current['cache_write_tokens']+=u.get('prompt_tokens_details',{}).get('cache_write_tokens',0)
+            current['reasoning_output_tokens']+=u.get('completion_tokens_details',{}).get('reasoning_tokens',0)
             count.update(current);usage.update(current)
             m=r.get('request_metrics',{})
             if m.get('started_at'):starts.append(timestamp(m['started_at']));ends.append(timestamp(m['finished_at']))

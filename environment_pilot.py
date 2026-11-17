@@ -1,6 +1,7 @@
 """Actual file build and review for one saved synthetic skill task."""
 import argparse
 import json
+import re
 import shutil
 from zipfile import ZipFile
 from pathlib import Path
@@ -26,7 +27,7 @@ def checks(root, plan):
     actual=set(inventory(root))
     formats=[]
     for item in plan['reference_files']:
-        p=root/item['path'];fmt=item['format'].lower().lstrip('.')
+        p=root/item['path'];fmt=re.sub(r'\s*[(]?utf[- ]?8[)]?$', '', item['format'].strip().lower()).lstrip('.')
         fmt={'markdown':'md','text':'txt','jpeg':'jpg'}.get(fmt,fmt)
         valid=p.suffix.lower()=='.'+fmt and p.is_file()
         if valid and fmt in {'docx','xlsx','pptx'}:
