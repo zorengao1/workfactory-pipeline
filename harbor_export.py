@@ -53,7 +53,6 @@ def export_task(task_id, environment, output, verifier=None):
         package = Path(temp)/task_id
         workspace = package/'environment/workspace'
         workspace.mkdir(parents=True)
-        shutil.copyfile(request, workspace/'REQUEST.txt')
         shutil.copytree(inputs, workspace/'inputs')
         (package/'instruction.md').write_text(request.read_text() +
             '\n\nWork in /task. Reference files are in /task/inputs. '
@@ -62,7 +61,7 @@ def export_task(task_id, environment, output, verifier=None):
         recipe = (ROOT/'docker/Dockerfile').read_text()
         recipe += '''\nUSER root
 COPY workspace/ /task/
-RUN mkdir -p /task/outputs && chown -R root:root /task/inputs /task/REQUEST.txt && chmod -R a-w /task/inputs /task/REQUEST.txt && chmod 755 /task && chown worker:worker /task/outputs
+RUN mkdir -p /task/outputs && chown -R root:root /task/inputs && chmod -R a-w /task/inputs && chmod 755 /task && chown worker:worker /task/outputs
 USER worker
 WORKDIR /task
 '''
@@ -81,7 +80,7 @@ WORKDIR /task
                 shutil.copyfile(source,dest)
             (tests/'test.sh').chmod(0o755)
         manifest = {
-            'task_id': task_id, 'format': 'harbor', 'schema_version': '1.4',
+            'task_id': task_id, 'format': 'harbor', 'schema_version': '1.4', 'export_version': 2,
             'verifier_status': 'provided_not_runtime_validated' if ready else 'pending',
             'runtime_validated': False,
             'reference_sha256': {str(p.relative_to(environment)):hashlib.sha256(p.read_bytes()).hexdigest() for p in allowed},
@@ -103,7 +102,7 @@ def ensure_task(task_id, environment, output):
               for p in _files(Path(environment))}
     package_hashes = {str(p.relative_to(output)):hashlib.sha256(p.read_bytes()).hexdigest()
                       for p in _files(output) if p != output/'export_manifest.json'}
-    if manifest['task_id'] != task_id or actual != expected or package_hashes != manifest.get('package_sha256'):
+    if manifest.get('export_version') != 2 or manifest['task_id'] != task_id or actual != expected or package_hashes != manifest.get('package_sha256'):
         raise ValueError('Harbor export changed; choose a new output directory')
     return manifest
 

@@ -207,12 +207,11 @@ OCR 依赖已写入 docker/Dockerfile，更新代码后需重新构建所配置�
 ├── environment/
 │   ├── Dockerfile
 │   └── workspace/
-│       ├── REQUEST.txt
 │       └── inputs/
 └── export_manifest.json
 ```
 
-`instruction.md` 来自最终工作环境中的任务说明。`inputs` 保留原始字节及多种文件格式。构建上下文只包含干净任务材料，不打包教师答案、信息图、提示词、API 密钥、生成日志或评分材料。模型在 `/task` 工作，输入文件只读，成果写入 `/task/outputs`，任务环境关闭联网。Dockerfile 包含仓库中的完整运行环境安装步骤，开发机无需预先拥有本机的 workfactory/runtime 镜像。
+`instruction.md` 是 Harbor 唯一任务说明入口，来自最终工作环境中的 REQUEST.txt，并补充工作路径与网络限制。导出环境不再复制 REQUEST.txt，原管线的文件保持不变。`inputs` 保留原始字节及多种文件格式。构建上下文只包含干净任务材料，不打包教师答案、信息图、提示词、API 密钥、生成日志或评分材料。模型在 `/task` 工作，输入文件只读，成果写入 `/task/outputs`，任务环境关闭联网。Dockerfile 包含仓库中的完整运行环境安装步骤，开发机无需预先拥有本机的 workfactory/runtime 镜像。
 
 旧任务可手动导出，环境路径应指向 `status.json` 中的 `clean_environment`，有修复时选最终修复版本。导出不重新调用模型，不改旧运行记录。
 
