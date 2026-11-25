@@ -10,8 +10,6 @@ import html
 import json
 import random
 import shutil
-import math
-from collections import Counter
 import re
 import urllib.request
 import urllib.error
@@ -125,7 +123,8 @@ def fetch_skills(limit,per_repo):
     def one(link):
         parts=link.strip('/').split('/');slug='__'.join(parts)
         body=fetch('https://www.skills.sh'+link,snapshot/(slug+'.html')).decode()
-        parser=SkillText();parser.feed(body);text=''.join(parser.text).strip()
+        from skills_discovery import full_skill_text
+        text=full_skill_text(body)
         if not text:raise ValueError('No rendered SKILL.md body '+link)
         github=list(dict.fromkeys(re.findall(r'href="(https://github.com/[^"?#]+)',body)))
         return {'source_id':'skills-sh-'+slug,'name':parts[-1],'repository':'/'.join(parts[:2]),
@@ -213,21 +212,10 @@ def balanced(items,seed):
 def related_skill_bundles(skills,limit,seed):
     skills=[s for s in skills if s.get('eligible_for_composition',True)]
     if len(skills)<2:raise ValueError('At least two substantial skill documents are required')
-    stop=set('the and for with that this from your you are have can use skill skills all will when into not as to of in a is be or on an by it at if'.split())
-    tokens=[Counter(t for t in re.findall(r'[a-z][a-z-]{2,}',s['name']+' '+s['content'].lower()) if t not in stop) for s in skills]
-    df=Counter(t for doc in tokens for t in doc)
-    vectors=[]
-    for doc in tokens:
-        vector={t:(1+math.log(n))*math.log(1+len(skills)/(1+df[t])) for t,n in doc.items()}
-        norm=math.sqrt(sum(v*v for v in vector.values())) or 1
-        vectors.append({t:v/norm for t,v in vector.items()})
+    # Seeds only. Online discovery supplies complementary skills and validates
+    # coverage before intent synthesis; lexical similarity is not acceptance.
     order=list(range(len(skills)));random.Random(seed).shuffle(order)
-    bundles=[]
-    for i in order[:limit]:
-        def score(j):return sum(v*vectors[j].get(t,0) for t,v in vectors[i].items())
-        neighbors=sorted((j for j in range(len(skills)) if j!=i),key=score,reverse=True)[:2]
-        bundles.append([skills[j] for j in [i,*neighbors]])
-    return bundles
+    return [[skills[i]] for i in order[:limit]]
 
 
 def build_cases(limit,skill_cases,seed):
@@ -247,8 +235,8 @@ def build_cases(limit,skill_cases,seed):
             if matched:materials.append({'source_id':'soc-2018-'+matched['code'],'provenance':matched['url'],'content':json.dumps({'detailed_occupation':matched,'major_group':major},ensure_ascii=False)})
         result.append({'task_id':'onet-'+o['onet_code'].replace('.','-'),'stage':'01a_occupation',
             'source_materials':materials,'source_metadata':{'soc_major':o['soc_major'],'onet_version':o['version'],'route':'occupation'},
-            'constraints':{'synthesis_allowed':True,'scope':'Select a coherent professional work objective supported by the supplied occupational duties. Use a diverse subset of activities rather than forcing all duties into one task. The work must be executable digitally. Label synthetic business context and data. Choose file carriers according to information needs; no fixed formats or counts. Do not claim web retrieval.'}})
-    # Lexical retrieval proposes candidates; the LLM must verify actual I/O compatibility.
+            'constraints':{'synthesis_allowed':True,'scope':'Select a coherent professional work objective supported by the supplied occupational duties. Use a diverse subset of activities rather than forcing all duties into one task. The work must be executable digitally. Label synthetic business context and data. Choose file carriers according to information needs; no fixed formats or counts. Only attribute actual downloaded sources; do not invent retrieval.'}})
+    # Skill documents seed work discovery; the default batch policy adds complementary skills online.
     bundles=related_skill_bundles(skills,skill_cases,seed)
     for i,bundle in enumerate(bundles):
         result.append({'task_id':f'skill-source-{i+1:04d}','stage':'01b_skill',
@@ -266,8 +254,8 @@ def build_cases(limit,skill_cases,seed):
         'occupation_task_statements':sum(len(o['tasks']) for o in occupations),
         'skill_repositories':len({s['repository'] for s in skills}),'skill_documents':len(skills),'skills_eligible_for_composition':sum(s.get('eligible_for_composition',True) for s in skills),'case_count':len(result),'occupation_cases':len(selected),
         'skill_cases':sum(c['stage']=='01b_skill' for c in result),'selected_major_groups':dict(majors),
-        'seed':seed,'sampling':'Round-robin SOC major groups; TF-IDF related skill documents followed by LLM I/O compatibility validation. Not paper frequency replication.',
-        'pending':['Real-deliverable source pool','Dynamic profession-context search agent','Learned semantic skill retrieval; current candidates use TF-IDF and LLM validation']}
+        'seed':seed,'sampling':'Round-robin SOC major groups; sampled skill anchors followed by online CLI discovery and full-body workflow review. Not paper frequency replication.',
+        'pending':['Real-deliverable source pool','Dynamic profession-context search agent','Embedding retrieval deferred; online CLI search and LLM selection enabled in default pipeline']}
     save(DATA/'statistics.json',report);return report
 
 

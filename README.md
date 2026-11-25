@@ -57,7 +57,7 @@ python3 scripts/check_environment.py
 python3 -m unittest discover -s tests -v
 ```
 
-config/source-pools.json 控制 O*NET 版本、技能仓库、采集后端与抽样参数。CLI 默认采集所列仓库的全部技能，不使用网页后端的 96 个总量和每仓库 6 个限制。新增仓库需加入 skills_repositories。该配置覆盖指定仓库，并非全站遍历。下载文件保存 URL、获取时间和 SHA256，缓存改变会明确报错。职业候选按 SOC 大类轮流排列，技能候选先用 TF-IDF 找相关文档，再由模型检查实际输入输出关系。该抽样方式没有复刻论文的频率分布。
+config/source-pools.json 控制 O*NET 版本、技能仓库、采集后端与抽样参数。CLI 默认采集所列仓库的全部技能，不使用网页后端的 96 个总量和每仓库 6 个限制。新增仓库需加入 skills_repositories。该配置覆盖指定仓库，并非全站遍历。下载文件保存 URL、获取时间和 SHA256，缓存改变会明确报错。职业候选按 SOC 大类轮流排列，技能候选先抽取入口锚点；默认批量管线再通过在线 skills CLI 搜索互补技能，并由模型检查正文、覆盖和实际输入输出关系。该抽样方式没有复刻论文的频率分布。
 
 技能池更新采用显式命令。首次采集需要联网，缓存复用不需要搜索或模型 API。缺少 CLI、下载失败或缓存被改动时明确停止，不自动切换后端。更新来源后应创建新的批次，不覆盖正在运行的任务。
 
@@ -163,7 +163,7 @@ scripts/prepare_mixed_inputs.py 从当前技能池为指定职业匹配候选技
 
 启用 external_retrieval 时显式配置 retrieval.backend 为 responses_web_search，并在外部凭据文件配置 OPENAI_API_MODE=responses。联网只发生在来源准备阶段，探针和教师只使用冻结后的可见任务材料。原生 web_search 请求强制执行检索并保存来源列表；候选真实交付物经下载和解析验证，失败候选逐个保留，不以搜索摘要代替已下载文件。最多检索三份候选，仍无可读文件则停止该任务。下载检查 Content-Length，截断文件保留后从同一 URL 重新获取。
 
-python3 scripts/prepare_mixed_inputs.py --occupations 13-1151.00 17-2081.00 27-3031.00 --output data/source_pools/gpt-mixed-three-timed.json
+python3 scripts/prepare_mixed_inputs.py --occupations 13-1151.00 17-2081.00 27-3031.00 --config /secure/model.env --audit runs/skill-discovery-preview --output data/source_pools/gpt-mixed-three-timed.json
 
 config/gpt-mixed-three-timed-policy.json 是三并发示例配置。先完成来源采集，再运行 service.py 或 run_models.py。scripts/audit_run.py 根据已保存响应 ID 去重统计模型用量、原生联网调用、阶段用量和任务墙钟时间，可传入明确的单价文件计算模型费用估计。缺少单价不填写费用。scripts/watch_run_report.py 仅观察指定批次，更新报告并在批次结束后退出，不启动模型任务或安排后续批次。
 
@@ -225,3 +225,25 @@ python3 harbor_export.py \
 已完成的历史批次不会自动重新运行。导出目录不能覆盖，恢复运行会校验源文件与导出文件哈希。教师轨迹和成果仍保留在任务包外的原运行目录。未来接入评分时，可通过 `--verifier /path/to/tests` 放入明确提供的验证器，单纯复制验证器仍不等于已完成 Harbor 运行验收。
 
 格式依据 https://github.com/harbor-framework/harbor/blob/main/docs-mintlify/tasks/configuration.mdx 。本轮自动测试覆盖结构、文件完整性、答案隔离和恢复校验，未执行 Harbor 容器端到端运行。
+
+
+## 在线技能搜索与能力覆盖
+
+默认 `config/pipeline.json` 已启用 `skill_discovery`。正常运行 `batch_generate.py` 时，会在意图合成和信息图构建前完成技能发现。旧配置缺少该字段时维持原行为，需要显式加入配置以启用。无需 embedding 模型，也不需要本地技能全集。
+
+准备环境需要 Node.js 和官方 `skills@1.8.1` CLI。可在开发机执行 `npm install -g skills@1.8.1`，并确保 `skills --version` 输出 `1.8.1`。搜索和技能正文获取在编排进程执行，不在教师沙箱执行。下载的技能指令仅作为任务构造资料，不会安装或激活为编排 Agent 的技能。
+
+流程如下。
+
+1. 模型根据职业或工作素材固定工作目标，提出三种以上互补能力和三个搜索短语。
+2. 官方 CLI 分别搜索，每个查询取前五条，轮流合并去重，首轮最多检查十五条候选。
+3. 读取技能页面的完整展开正文，按内容哈希去重，保存原页面及正文。按技能 ID 加锁共享缓存，默认一天后更新。历史版本保留。
+4. 模型通常选择二至四个技能，提交正文证据、能力覆盖、必要资源与步骤依赖。程序校验能力 ID 全覆盖、引用证据存在、至少六个不同操作及四层有序依赖。模型另外检查操作是否实质不同、依赖是否真实、资源是否可提供；数量门槛不能代替语义审查。
+5. 能力不足时按缺口改写关键词，最多补搜两轮，每轮最多新增十条，累计最多检查三十五条。到上限仍不充分则拒绝该源任务，继续批次其他任务。网络或接口故障单独报错，不能算零匹配。
+6. 选中正文与工作流进入 01 意图合成，02 检查是否保留能力和复杂度，03 将必要输入及派生工作落实为信息图。探针和独立教师仍负责最终执行验证。
+
+`skills_discovery.py` 是实现入口，`prompts/skills_plan.txt` 和 `prompts/skills_review.txt` 定义两次模型调用的职责。模型沿用该源任务阶段的 `stage_models` 与 `stage_credentials`，使用现有 API 并发限流。skills CLI 的网络请求不使用模型 API。`scripts/skills_http_observer.cjs` 只观察 CLI 原有请求，识别被 CLI 隐藏的 HTTP 错误，不更换搜索服务或排序算法。
+
+每个任务的 `skill_discovery/` 保留输入、模型请求和响应、每轮关键词、CLI 原始输出和 HTTP 状态、候选完整正文、覆盖检查及接受或拒绝结果。成功检查点可复用，输入、模型或策略变化会要求使用新运行目录。数据和日志均在 Git 忽略目录，密钥仍从本地 env 文件读取。
+
+所有阈值、缓存路径、超时、CLI 路径都可在 `skill_discovery` 配置中调整。长文不截断；超过模型上下文时显式失败，不静默删去正文。当前仅保证检查流程执行，不能保证每个候选最终通过探针或教师。此改动不包含全站枚举、职业成功覆盖调度、embedding 索引或已验证的高并发吞吐。

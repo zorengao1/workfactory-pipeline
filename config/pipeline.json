@@ -29,5 +29,23 @@
   "retrieval": {
     "backend": "responses_web_search",
     "candidate_attempts": 3
+  },
+  "skill_discovery": {
+    "enabled": true,
+    "cli": "skills",
+    "cli_version": "1.8.1",
+    "initial_queries": 3,
+    "per_query": 5,
+    "initial_candidates": 15,
+    "extra_candidates": 10,
+    "max_research_rounds": 2,
+    "max_candidates": 35,
+    "min_selected": 2,
+    "max_selected": 4,
+    "min_operations": 6,
+    "min_chain_depth": 4,
+    "cache_dir": "data/skills_discovery_cache",
+    "cache_ttl_seconds": 86400,
+    "request_timeout": 60
   }
 }

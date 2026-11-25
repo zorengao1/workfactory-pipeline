@@ -208,6 +208,19 @@ def run_case(case, model_dir, config, max_attempts=3):
         raise ValueError('Task configuration changed; use a new output directory to preserve prior attempts')
     if (dest/'status.json').exists() and read_json(dest/'status.json').get('state')=='candidate_complete':return
     save(dest/'seed.json',case)
+    discovery = config.get('_POLICY', {}).get('skill_discovery', {})
+    if discovery.get('enabled') and not case.get('source_metadata', {}).get('skill_discovery'):
+        from skills_discovery import enrich_skills, DiscoveryRejected
+        from source_artifacts import full_text_inputs
+        update(dest, state='discovering_skills', model=config['OPENAI_MODEL'], pid=os.getpid())
+        try:
+            case = enrich_skills(full_text_inputs(case), dest/'skill_discovery', stage_config(config, case['stage']))
+        except DiscoveryRejected as exc:
+            update(dest, state='rejected', reason=str(exc))
+            return
+        except Exception as exc:
+            update(dest, state='error', reason=str(exc).replace(config['OPENAI_API_KEY'], '[REDACTED]'))
+            raise
     if config.get('_POLICY',{}).get('external_retrieval'):
         from source_retrieval import enrich_case
         update(dest,state='retrieving_sources',model=config['OPENAI_MODEL'],pid=os.getpid())
