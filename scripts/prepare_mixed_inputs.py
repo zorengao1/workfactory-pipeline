@@ -4,10 +4,10 @@ import json
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from contracts import ROOT
-from pilot import load_config
-from pipeline_config import load_policy, stage_config
-from skills_discovery import enrich_skills, DiscoveryRejected, save
+from workfactory.pipeline.contracts import ROOT
+from workfactory.clients.pilot import load_config
+from workfactory.pipeline.pipeline_config import load_policy, stage_config
+from workfactory.sources.skills_discovery import enrich_skills, DiscoveryRejected, save
 
 
 def main():

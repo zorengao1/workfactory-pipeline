@@ -5,8 +5,9 @@ from pathlib import Path
 import sys
 import time
 sys.path.insert(0,str(Path(__file__).resolve().parent))
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from audit_run import audit
-from batch_report import report
+from workfactory.exports.batch_report import report
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('root',type=Path);a=p.parse_args();root=a.root.resolve()

@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from unittest.mock import patch
-from download_transport import fetch_bytes
+from workfactory.sources.download_transport import fetch_bytes
 class HTTPTests(unittest.TestCase):
  def test_real_http(self):
   counts={};payload=b'actual PDF-like test content'
@@ -30,7 +30,7 @@ class HTTPTests(unittest.TestCase):
   server=ThreadingHTTPServer(('127.0.0.1',0),Handler);thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
   try:
    for route in ['full','redirect','range','empty','short','busy']:
-    with self.subTest(route=route),tempfile.TemporaryDirectory() as d,patch('download_transport.time.sleep'):
+    with self.subTest(route=route),tempfile.TemporaryDirectory() as d,patch('workfactory.sources.download_transport.time.sleep'):
      body,*_=fetch_bytes(f'http://127.0.0.1:{server.server_port}/{route}',Path(d));self.assertEqual(body,payload)
    with tempfile.TemporaryDirectory() as d:
     from urllib.error import HTTPError

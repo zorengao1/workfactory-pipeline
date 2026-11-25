@@ -1,7 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
-from source_artifacts import artifacts, read_source, stage_reuse, verify_reuse, binding_errors, digest
+from workfactory.sources.source_artifacts import artifacts, read_source, stage_reuse, verify_reuse, binding_errors, digest
 
 
 class ArtifactTest(unittest.TestCase):
@@ -44,7 +44,7 @@ class ArtifactTest(unittest.TestCase):
         with self.assertRaises(ValueError):read_source(artifacts(self.materials),'report')
 
     def test_preview_preserves_full_text_and_searches_tail(self):
-        from source_artifacts import text_metadata, search_source
+        from workfactory.sources.source_artifacts import text_metadata, search_source
         text='x'*120000+'unique evidence'
         meta=text_metadata(self.root/'artifact.txt',text)
         self.assertFalse(meta['content_is_preview'])
@@ -59,30 +59,30 @@ class ArtifactTest(unittest.TestCase):
         with self.assertRaises(ValueError):artifacts(self.materials)
 
     def test_legacy_preview_restored_without_changing_input(self):
-        from source_artifacts import full_text_inputs
+        from workfactory.sources.source_artifacts import full_text_inputs
         inputs={'source_materials':self.materials}
         result=full_text_inputs(inputs)
         self.assertTrue(result['source_materials'][0]['content'].endswith('late page evidence'))
         self.assertEqual(inputs['source_materials'][0]['content'],'excerpt')
 
     def test_unrecoverable_preview_rejected(self):
-        from source_artifacts import full_text_inputs
+        from workfactory.sources.source_artifacts import full_text_inputs
         with self.assertRaisesRegex(ValueError,'Full source text required'):
             full_text_inputs({'source_materials':[{'source_id':'old','content':'excerpt','content_is_preview':True}]})
 
     def test_intent_and_review_requests_contain_tail(self):
         from unittest.mock import patch
-        from pilot import run_stage
+        from workfactory.clients.pilot import run_stage
         for stage in ('01a_occupation','01b_skill','01c_deliverable','02_intent_review'):
             dest=self.root/stage;dest.mkdir()
-            with patch('pilot.render',side_effect=lambda stage,inputs:[{'role':'user','content':inputs['source_materials'][0]['content']}]), patch('pilot.complete',side_effect=RuntimeError('stop before paid API')) as api:
+            with patch('workfactory.clients.pilot.render',side_effect=lambda stage,inputs:[{'role':'user','content':inputs['source_materials'][0]['content']}]), patch('workfactory.clients.pilot.complete',side_effect=RuntimeError('stop before paid API')) as api:
                 with self.assertRaisesRegex(RuntimeError,'stop before paid API'):
                     run_stage(stage,{'source_materials':self.materials},dest,{'OPENAI_MODEL':'test','OPENAI_API_KEY':'test'},100)
             self.assertIn('late page evidence',api.call_args.args[1][0]['content'])
 
     def test_cached_preview_result_cannot_bypass_full_input(self):
         import json
-        from batch_generate import text_stage
+        from workfactory.pipeline.batch_generate import text_stage
         stage=self.root/'01c_deliverable';stage.mkdir()
         (stage/'validation.json').write_text(json.dumps({'format_and_contract_pass':True,'status':'ok'}))
         (stage/'parsed.json').write_text(json.dumps({'result':{}}))

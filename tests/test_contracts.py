@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from contracts import (ROOT, STAGES, REQUIRED_CHECKS, input_errors, output_errors,
+from workfactory.pipeline.contracts import (ROOT, STAGES, REQUIRED_CHECKS, input_errors, output_errors,
                        output_schema, plan_errors, render, validate)
 
 

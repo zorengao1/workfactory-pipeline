@@ -1,5 +1,5 @@
 import unittest
-from contracts import REQUIRED_CHECKS,output_errors
+from workfactory.pipeline.contracts import REQUIRED_CHECKS,output_errors
 
 class FormatFitnessGateTests(unittest.TestCase):
     def review(self):

@@ -3,7 +3,7 @@ import threading
 import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor
-from api_gate import api_slot
+from workfactory.clients.api_gate import api_slot
 
 
 class ApiGateTests(unittest.TestCase):

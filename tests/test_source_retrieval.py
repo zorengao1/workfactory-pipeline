@@ -1,7 +1,7 @@
 import json
 import unittest
-from source_retrieval import source_urls, parse_research
-from responses_adapter import request_payload
+from workfactory.sources.source_retrieval import source_urls, parse_research
+from workfactory.clients.responses_adapter import request_payload
 
 class MixedInputTests(unittest.TestCase):
     def test_native_search_has_required_tool_and_auditable_sources(self):

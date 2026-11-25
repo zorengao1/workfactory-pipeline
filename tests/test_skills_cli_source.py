@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from skills_cli_source import collect_skills
+from workfactory.sources.skills_cli_source import collect_skills
 
 
 class SkillsCLISourceTests(unittest.TestCase):
@@ -23,7 +23,7 @@ class SkillsCLISourceTests(unittest.TestCase):
         return subprocess.CompletedProcess(command,0,'installed','')
 
     def collect(self, tmp):
-        with patch('skills_cli_source.shutil.which',return_value='/test/skills'),patch('skills_cli_source.subprocess.run',side_effect=self.fake_cli):
+        with patch('workfactory.sources.skills_cli_source.shutil.which',return_value='/test/skills'),patch('workfactory.sources.skills_cli_source.subprocess.run',side_effect=self.fake_cli):
             return collect_skills(['example/reports'],Path(tmp),Path(tmp)/'skills.json')
 
     def test_original_markdown_references_and_lock_are_preserved(self):
@@ -40,7 +40,7 @@ class SkillsCLISourceTests(unittest.TestCase):
     def test_cached_collection_is_offline(self):
         with tempfile.TemporaryDirectory() as tmp:
             expected=self.collect(tmp)
-            with patch('skills_cli_source.subprocess.run') as run,patch('skills_cli_source.shutil.which') as which:
+            with patch('workfactory.sources.skills_cli_source.subprocess.run') as run,patch('workfactory.sources.skills_cli_source.shutil.which') as which:
                 records=collect_skills(['example/reports'],Path(tmp),Path(tmp)/'offline.json')
                 self.assertEqual(records,expected)
                 run.assert_not_called();which.assert_not_called()
@@ -55,7 +55,7 @@ class SkillsCLISourceTests(unittest.TestCase):
     def test_failure_preserves_previous_pool(self):
         with tempfile.TemporaryDirectory() as tmp:
             output=Path(tmp)/'skills.json';output.write_text('previous pool')
-            with patch('skills_cli_source.shutil.which',return_value='/test/skills'),patch('skills_cli_source.subprocess.run',side_effect=[subprocess.CompletedProcess([],0,'1.8.1\n',''),subprocess.CompletedProcess([],1,'','download failed')]):
+            with patch('workfactory.sources.skills_cli_source.shutil.which',return_value='/test/skills'),patch('workfactory.sources.skills_cli_source.subprocess.run',side_effect=[subprocess.CompletedProcess([],0,'1.8.1\n',''),subprocess.CompletedProcess([],1,'','download failed')]):
                 with self.assertRaisesRegex(RuntimeError,'download failed'):
                     collect_skills(['example/reports'],Path(tmp),output)
             self.assertEqual(output.read_text(),'previous pool')

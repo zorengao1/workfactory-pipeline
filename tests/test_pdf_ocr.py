@@ -6,8 +6,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from pdf_extraction import extract_pdf
-from pipeline_config import stage_config
+from workfactory.sources.pdf_extraction import extract_pdf
+from workfactory.pipeline.pipeline_config import stage_config
 
 
 class PDFOCRTests(unittest.TestCase):
@@ -16,7 +16,7 @@ class PDFOCRTests(unittest.TestCase):
         reader.pages = [Mock(extract_text=Mock(return_value=t)) for t in texts]
         module = types.SimpleNamespace(PdfReader=Mock(return_value=reader))
         diagnostic = io.StringIO()
-        with patch.dict('sys.modules', {'pypdf': module}), patch('pdf_extraction.subprocess.run', runner):
+        with patch.dict('sys.modules', {'pypdf': module}), patch('workfactory.sources.pdf_extraction.subprocess.run', runner):
             text = extract_pdf(Path('/source/artifact'), diagnostic)
         return text, diagnostic.getvalue()
 
@@ -50,12 +50,12 @@ class PDFOCRTests(unittest.TestCase):
             self.extract([''], run)
 
     def test_stage_credentials_cannot_enable_search(self):
-        with patch('pilot.load_config', return_value={'NATIVE_WEB_SEARCH': '1'}):
+        with patch('workfactory.clients.pilot.load_config', return_value={'NATIVE_WEB_SEARCH': '1'}):
             result = stage_config({'_POLICY': {'stage_credentials': {'09_teacher': 'secret.env'}}}, '09_teacher')
         self.assertEqual(result['NATIVE_WEB_SEARCH'], '0')
 
     def test_default_search_does_not_enable_solver_search(self):
-        from pipeline_config import load_policy, source_cases
+        from workfactory.pipeline.pipeline_config import load_policy, source_cases
         policy = load_policy()
         self.assertTrue(policy['external_retrieval'])
         seeds = [{'task_id':'test', 'stage':'01a_occupation', 'source_materials':[{'content':'test'}], 'constraints':{'external_retrieval':True}}]
@@ -63,14 +63,14 @@ class PDFOCRTests(unittest.TestCase):
             self.assertTrue(all(not c['constraints']['external_retrieval'] for c in source_cases(policy)))
 
     def test_sources_not_mounted_for_teacher(self):
-        from tool_runtime import run_agent
+        from workfactory.runtime.tool_runtime import run_agent
         config = {'_POLICY': {'sandbox': {'backend': 'docker', 'construction_sources': '/private'}},
                   '_CONSTRUCTION_SOURCES': '/private'}
-        with patch('docker_runtime.DockerRuntime') as runtime, patch('tool_runtime._run_agent'):
+        with patch('workfactory.runtime.docker_runtime.DockerRuntime') as runtime, patch('workfactory.runtime.tool_runtime._run_agent'):
             run_agent('09_teacher', {}, '/task', '/logs', config)
         self.assertNotIn('construction_sources', runtime.call_args.args[2])
 
     def test_extractor_embeds_current_ocr_implementation(self):
-        from source_retrieval import EXTRACTOR
+        from workfactory.sources.source_retrieval import EXTRACTOR
         compile(EXTRACTOR, '<extractor>', 'exec')
         self.assertIn('t=extract_pdf(p,sys.stderr)', EXTRACTOR)

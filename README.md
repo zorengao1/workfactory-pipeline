@@ -1,249 +1,106 @@
+<div align="center">
+
 # WorkFactory Pipeline
 
-专业任务环境与教师候选轨迹生成管线。
+**从真实职业、技能和交付物，生成可执行任务环境与教师轨迹**
 
-## 流程
+依据 WorkFactory 论文构建的独立实现
 
-真实来源池 → 意图生成与审查 → 信息支撑图与文件规划 → 文件构建与审查 → 独立探针与修复 → 独立教师求解 → 候选轨迹导出。
+[快速启动](#快速启动) · [目录导航](#目录导航) · [运行手册](docs/guide/RUNNING.md) · [代码地图](docs/ARCHITECTURE.md) · [实现状态](docs/IMPLEMENTATION_STATUS.md)
 
-模型、任务并发、API 并发、阶段模型和容器资源通过配置控制。文件数量和格式由工作需要决定。环境可包含 PDF、DOCX、PPTX、XLSX、CSV、JSON 等实际可处理的文件。
+</div>
 
-当前实现、已验证范围及未完成项见 [实现状态清单](docs/IMPLEMENTATION_STATUS.md)。
+---
 
-## 03 纯 agentic 规划
+## 管线概览
 
-03 默认由模型自主选择规划、检查和修订顺序，不固定运行 03A 至 03E。工具包括 save_plan、update_plan、check_plan、review_plan、submit_plan。审核使用同一阶段模型的新上下文。
+~~~mermaid
+flowchart LR
+    A["SOC · O*NET<br/>skills.sh · 真实交付物"] --> B["01–02<br/>意图合成与审查"]
+    B --> C["03<br/>信息图规划与审核"]
+    C --> D["04–05<br/>文件构建与检查"]
+    D --> E["06<br/>独立探针"]
+    E -->|阻断问题| F["07–08<br/>修复与工作保留审查"]
+    F --> E
+    E -->|通过| G["09<br/>独立教师求解"]
+    D --> H["Harbor 任务环境"]
+    G --> I["教师交付物 · 候选轨迹"]
+~~~
 
-提交要求当前版本通过结构检查与独立审核，所有实质问题都有关闭证据。计算口径、单位、时间窗和跨文件矛盾不能降为普通建议。合理的重复信息和业务冗余允许保留。修改后原审核失效。达到 plan_max_turns 上限仍未通过就停止并保留失败记录，不进入 04。默认上限为 20，可在管线策略中配置。
+- **真实来源**　保留下载原文件、完整提取正文、来源链接与哈希
+- **按任务选择格式**　支持 PDF、DOCX、PPTX、XLSX、CSV、JSON 等，不设格式或数量配额
+- **独立执行环境**　探针与教师在专属 Docker 工作区内执行，构造资料与求解材料分开
+- **可追踪运行**　保存模型请求、工具调用、审核结果和失败尝试，支持配置并发与恢复
+- **标准化交付**　导出 Harbor 任务环境，当前范围暂不包含最终评分器
 
-03 使用 stage_models 和 stage_credentials 中的 03_plan 配置，接口必须支持函数工具调用。纯文字接口不能承担此阶段，不会自动替换模型。03 不构建实际文件，沿用原有六块计划结构交给 04。
+## 目录导航
 
-产物保存在任务的 03_plan 目录，包括各轮请求与响应、计划版本、审核证据、events.jsonl 和 validation.json。成功才写入 parsed.json 与 final_plan.json。已有成功任务仍可读取历史结果；需要用新方式重跑时使用新的任务运行目录。中断后的重新运行保留旧尝试目录，重新规划，不自动接续中断工具调用。
+| 目录 | 内容 |
+|---|---|
+| [workfactory/pipeline](workfactory/pipeline) | 阶段编排、信息图规划、构建检查和输出契约 |
+| [workfactory/sources](workfactory/sources) | SOC、O*NET、技能搜索、真实交付物下载与解析 |
+| [workfactory/clients](workfactory/clients) | 模型接口、Responses 适配和 API 并发控制 |
+| [workfactory/runtime](workfactory/runtime) | Agent 工具循环、Docker 隔离和文件读写工具 |
+| [workfactory/exports](workfactory/exports) | Harbor、教师轨迹和批次报告导出 |
+| [workfactory/operations](workfactory/operations) | 多模型批次与后台运行 |
+| [workfactory/experiments](workfactory/experiments) | 历史小样本实验和回归入口 |
+| [config](config) | 管线策略、来源配置和凭据模板 |
+| [prompts](prompts) · [schemas](schemas) | 各阶段提示词与 JSON 输出结构 |
+| [scripts](scripts) · [tests](tests) | 检查、审计脚本与自动化测试 |
+| [docker](docker) | 可复建的运行环境 Dockerfile |
+| [resources](resources) · [fixtures](fixtures) | 固定来源快照与测试样例 |
+| [docs](docs) | 运行手册、代码地图和历史记录 |
 
-## 原素材入口
+下载资料保存到本地 <code>data/</code>，生成结果保存到 <code>runs/</code>。两者均不提交到 GitHub。
 
-默认输入已改为 SOC、O*NET 和 skills.sh 来源生成的清单。config/cases.json 等手写情境仅保留为测试样例，不作为默认来源。
+## 快速启动
 
-| 来源 | 用途 | 固定信息 |
-|---|---|---|
-| BLS 2018 SOC | 大类、细分职业、职责和层级 | 论文引用的 major_groups.htm |
-| O*NET | 细分角色、实际任务、技能与工作活动 | 31.0 版本 |
-| skills.sh | 技能文档正文及技能组合候选 | 固定本地抓取快照和哈希 |
+在仓库根目录执行。需要 Python 3.9+、Node.js、Docker Engine，以及可用的模型接口。
 
-BLS 官方地址为 https://www.bls.gov/soc/2018/major_groups.htm 。本机普通脚本收到 HTTP 403，返回页面说明自动采集受到限制。正常浏览器能够访问同一地址，因此通过 Chrome 保存了官方 HTML。resources/soc-2018 保存该页面和来源哈希，属于可核验的原素材快照。后续开发机默认读取这份固定快照，不依赖聊天或浏览器会话，也不切换其他来源。
-
-需要更新 BLS 快照时，在浏览器打开同一官方地址并保存为仅 HTML，再显式导入。
-
-```bash
-python3 source_pools.py fetch-soc --import-html /absolute/path/major_groups.html
-```
-
-技能采集默认使用 skills CLI，在临时 HOME 和临时工作区下载配置中的仓库。原始 SKILL.md、配套文件、CLI 锁文件与内容哈希保存在 data/。文档仅作为合成意图的素材，不执行其中的指令或脚本，不修改用户现有 Agent 的技能配置。已有快照经哈希校验后可离线复用。
-
-## 开发机准备
-
-需要 Python 3.9 或更新版本、可用 Docker Engine 和模型接口。控制器使用 Python 标准库。技能采集额外需要 Node.js 和 skills CLI 1.8.1。Docker 中安装文档处理库和 LibreOffice，不依赖 Codex 或本机 Office。
-
-```bash
+~~~bash
 git clone https://github.com/zorengao1/workfactory-pipeline.git
 cd workfactory-pipeline
-python3 source_pools.py fetch-soc
-python3 source_pools.py fetch-onet
+
+# 准备来源与运行环境
 npm install -g skills@1.8.1
-python3 source_pools.py fetch-skills
-python3 source_pools.py build
+python3 -m workfactory sources fetch-soc
+python3 -m workfactory sources fetch-onet
+python3 -m workfactory sources fetch-skills
+python3 -m workfactory sources build
 docker build -t workfactory/runtime:v2 docker
+
+# 检查安装与代码
 python3 scripts/check_environment.py
-python3 -m unittest discover -s tests -v
-```
+python3 -m unittest discover -s tests
 
-config/source-pools.json 控制 O*NET 版本、技能仓库、采集后端与抽样参数。CLI 默认采集所列仓库的全部技能，不使用网页后端的 96 个总量和每仓库 6 个限制。新增仓库需加入 skills_repositories。该配置覆盖指定仓库，并非全站遍历。下载文件保存 URL、获取时间和 SHA256，缓存改变会明确报错。职业候选按 SOC 大类轮流排列，技能候选先抽取入口锚点；默认批量管线再通过在线 skills CLI 搜索互补技能，并由模型检查正文、覆盖和实际输入输出关系。该抽样方式没有复刻论文的频率分布。
-
-技能池更新采用显式命令。首次采集需要联网，缓存复用不需要搜索或模型 API。缺少 CLI、下载失败或缓存被改动时明确停止，不自动切换后端。更新来源后应创建新的批次，不覆盖正在运行的任务。
-
-```bash
-# 单个仓库试采集，结果单独保存
-python3 source_pools.py fetch-skills --repository anthropics/skills --output tmp/skills-preview.json
-# 使用已验证的本地缓存生成技能池
-python3 source_pools.py fetch-skills
-# 显式重新下载配置中的仓库，旧快照保留
-python3 source_pools.py fetch-skills --refresh
-# 再生成候选输入，之后以新批次运行
-python3 source_pools.py build
-```
-
-原网页采集代码保留，可显式选择 fetch-skills --backend html。默认不会自动回退到网页采集。
-
-data/source_pools/statistics.json 给出原素材和候选输入规模。当前快照统计见 docs/SOURCE_POOL_STATISTICS.json。候选输入数量不等于已生成环境或已验收轨迹数量。
-
-build 默认每个 O*NET 职业产生一个候选输入，并创建 24 个技能组合候选。小批量验证可以显式减少数量。
-
-```bash
-python3 source_pools.py build --occupations 23 --skill-cases 4
-```
-
-每个职业不强制包含全部职责，只要求模型从来源支持的工作中选择一个可数字化执行的目标。业务情境和具体企业数据的合成须标注。
-
-## 密钥与运行
-
-密钥保存在仓库外部的 env 文件，模板为 config/credentials.env.example。不要提交密钥、本机配置或 runs/。默认模型入口支持 deepseek-v4.1-flash-1017、mimo-v2.6-flash、gpt-6.1-sol。
-
-```bash
+# 配置模型与并发，凭据保存在仓库之外
 cp config/pipeline.json config/local.json
-python3 batch_generate.py --config /absolute/path/credentials.env --pipeline-config config/local.json --output runs/batch-001 --model deepseek-v4.1-flash-1017
-```
+python3 -m workfactory batch \
+  --config /absolute/path/credentials.env \
+  --pipeline-config config/local.json \
+  --output runs/batch-001 \
+  --model deepseek-v4.1-flash-1017
+~~~
 
-两个模型批次可以同时启动，模型分别用于本组构造和教师求解。
+凭据格式见 [credentials.env.example](config/credentials.env.example)。运行前按实际接口修改策略中的阶段模型、凭据路径、检索和并发参数。默认在线检索需要支持 Responses web_search 的接口，工具执行阶段需要工具调用能力。
 
-```bash
-python3 run_models.py --config /absolute/path/credentials.env --pipeline-config config/local.json --output runs/batch-001 --models deepseek-v4.1-flash-1017 mimo-v2.6-flash
-```
+更多命令可通过 <code>python3 -m workfactory --help</code> 查看。
 
-config/local.json 的 task_workers 控制每组完整任务并发，api_max_concurrency 控制每个模型的在途请求数。每个容器默认限制 2 GB 内存、1 CPU。接口配额与容器资源必须分别验证，64 并发尚未压测。
+## 从哪里看结果
 
-Linux 可以在已有的 tmux 或开发机作业调度器中运行上述命令。macOS 可使用 launchd 后台入口。
+| 想看什么 | 查看位置 |
+|---|---|
+| 当前批次运行状态 | 批次及任务目录中的 status.json 与日志 |
+| 各模块输入输出 | 阶段目录中的请求、响应、parsed.json 和审核记录 |
+| 实际交付文件 | teacher_workspace/outputs/ |
+| 教师候选轨迹 | trajectory.json |
+| Harbor 任务包 | 按 [Harbor 导出说明](docs/guide/RUNNING.md#harbor-环境与任务导出) 生成 |
+| 失败后的恢复方法 | [运行手册](docs/guide/RUNNING.md#输出与恢复) |
 
-```bash
-python3 service.py start --config /absolute/path/credentials.env --pipeline-config config/local.json --output runs/batch-001 --models deepseek-v4.1-flash-1017
-python3 service.py status --output runs/batch-001
-python3 service.py stop --output runs/batch-001
-```
+## 开发与阅读
 
-后台入口在关闭聊天或终端后仍可运行。睡眠、关机、退出系统登录会影响本地执行，不自动无限重启失败批次。Documents 下的后台脚本可能被 macOS 文件访问权限阻断，已验证的本地部署路径为 ~/workfactory-pipeline。
+从 [代码地图](docs/ARCHITECTURE.md) 了解模块调用关系，从 [运行手册](docs/guide/RUNNING.md) 查看来源采集、阶段模型、下载解析、技能筛选与恢复细节。
 
-## 检查真实来源是否驱动模型
+当前实现及实验记录见 [实现状态](docs/IMPLEMENTATION_STATUS.md)。旧版发布清单和说明归档在 [docs/archive](docs/archive)，新运行请使用上述模块命令。
 
-以下命令调用模型，分别读取法律、教育职业资料及两组真实技能文档，执行意图生成与审查。它只检查来源到意图这部分，不生成完整环境。
-
-```bash
-python3 scripts/check_source_inputs.py --config /absolute/path/credentials.env --output runs/source-input-check
-```
-
-## 输出与恢复
-
-```text
-runs/<batch>/<model>/<task>/
-  seed.json
-  status.json
-  attempt-01/
-    initial_plan.json
-    materialization-00/
-    repair-1/
-    teacher_workspace/REQUEST.txt
-    teacher_workspace/inputs/
-    teacher_workspace/outputs/
-    trajectory.json
-```
-
-各阶段保存请求、响应、工具结果与检查结论。trajectory.json 是教师候选轨迹，人工验收和训练数据合格分别记录。batch_report.py 汇总批次状态。
-
-完成任务会跳过，通过检查的阶段会复用。请求已保存但响应未保存时可从对话恢复。响应已保存而工具状态不明时停止并要求审查。更改代码、配置或输入后应使用新批次目录，保留失败尝试。
-
-API 调用入口为 pilot.py，限流在 api_gate.py，阶段编排在 batch_generate.py，工具循环在 tool_runtime.py，容器生命周期在 docker_runtime.py，阶段提示词和输出契约位于 prompts/ 与 schemas/。
-
-## 当前验证与待完成部分
-
-Dockerfile 已成功构建，容器内文档生成、读回与输入只读检查通过。已有 DeepSeek 候选轨迹及三条 GPT 混合来源联网候选轨迹完成执行，尚未统一完成人工验收和训练数据整理。
-
-BLS、O*NET、skills CLI、GPT 原生 web_search 和真实交付物下载解析已接入。external_retrieval=true 需要显式配置 responses_web_search 后端及 Responses 接口模式，缺少配置时明确报错。
-
-文件格式规划鼓励有业务意义的多样性，主动考虑论文涉及及其他可处理格式，按用途、受众和使用方式说明理由，构建审核增加必查 format_fitness，每份输入文件必须说明用途、受众、使用方式和格式选择理由，禁止因方便生成而默认使用 MD。根据任务实际需要选择 DOCX、PDF、PPTX、XLSX 等格式，鼓励合理组合，同类材料适合统一格式时保持统一，不强凑种类或数量。这一修改通过本地测试，尚未用新批次验证实际效果。旧批次使用旧提示词，历史结果不回写。
-
-按职业在线发现与缓存技能、覆盖采样控制、程序证据包加单轮审核、独立成果验收、长轨迹拒绝采样、训练 token 掩码、细粒度恢复、跨机器调度和高并发压力测试仍待完成。逐项状态见 [实现状态清单](docs/IMPLEMENTATION_STATUS.md)。
-
-GitHub 保存源码、配置、提示词、测试、说明、Dockerfile 和小型固定来源资源，不保存 Docker 镜像或容器。开发机从 Docker Hub 拉取基础镜像并按 Dockerfile 构建独立环境。
-
-## Responses 接口
-
-在外部凭据文件设置 `OPENAI_API_MODE=responses` 可使用 Responses 接口。适配器保留推理项、函数调用与工具结果，按完整历史恢复执行。可选 `REASONING_EFFORT` 指定服务支持的推理强度，不默认关闭推理。DeepSeek 和 MiMo 仍使用原 Chat Completions 接口。Responses 当前使用非流式响应，完整响应落盘后进入工具执行。
-
-## 混合来源并发试跑
-
-scripts/prepare_mixed_inputs.py 从当前技能池为指定职业匹配候选技能。候选的词面相关性由检索提名，模型仍需判断真实适用性。
-
-启用 external_retrieval 时显式配置 retrieval.backend 为 responses_web_search，并在外部凭据文件配置 OPENAI_API_MODE=responses。联网只发生在来源准备阶段，探针和教师只使用冻结后的可见任务材料。原生 web_search 请求强制执行检索并保存来源列表；候选真实交付物经下载和解析验证，失败候选逐个保留，不以搜索摘要代替已下载文件。最多检索三份候选，仍无可读文件则停止该任务。下载检查 Content-Length，截断文件保留后从同一 URL 重新获取。
-
-python3 scripts/prepare_mixed_inputs.py --occupations 13-1151.00 17-2081.00 27-3031.00 --config /secure/model.env --audit runs/skill-discovery-preview --output data/source_pools/gpt-mixed-three-timed.json
-
-config/gpt-mixed-three-timed-policy.json 是三并发示例配置。先完成来源采集，再运行 service.py 或 run_models.py。scripts/audit_run.py 根据已保存响应 ID 去重统计模型用量、原生联网调用、阶段用量和任务墙钟时间，可传入明确的单价文件计算模型费用估计。缺少单价不填写费用。scripts/watch_run_report.py 仅观察指定批次，更新报告并在批次结束后退出，不启动模型任务或安排后续批次。
-
-## 原文件复用
-
-03 接收冻结原文件目录，并可用 read_source_text 分段查阅下载文件的完整提取正文，返回读取范围和总长度。文字提取不等于已检查图表版式。适合任务的原文件可直接作为输入，围绕它做更新、审查或比较；仅作意图线索的来源继续留在构造侧。
-
-reference_files 的 reuse 和 adapt 项须填写 source_ids，绑定 source_materials 中带 snapshot 的真实文件。reuse 必须保持单份原文件及其格式，04 前由控制器直接复制，04 完成后校验 SHA256 不变。adapt 由构建者读取原件并按计划改编，记录位置及内容损失。缺失或哈希不符的原文件会报错，不自动转成合成文件。
-
-无需强制所有任务复用真实文件，也不要求模型一次读完整个文件。本次测试覆盖截断范围以后的正文读取、原文件复制、篡改拒绝、来源绑定及路径检查。真实模型自主选择 reuse 的端到端比例尚待批量验证。
-
-来源准备完整保存提取正文并记录哈希，content 直接包含完整正文，不再保留 12000 字符限制。01 三个意图入口和 02 意图审核在发送请求前恢复旧缓存中的全文，并核验可用的文件哈希。全文缺失或损坏时明确失败，不退回预览。03 仍可搜索和分段查阅原文。超过模型上下文时由接口明确报错，不自动截断。每次 01 和 02 保存实际 input.json；旧阶段缓存缺少该文件或输入不一致时，要求使用新输出目录，避免沿用基于预览生成的意图及下游产物。历史文件保持不变。
-
-
-## 真实交付物下载与解析检查
-
-下载器对超时、断连、空响应、截断、408、429 和部分 5xx 最多尝试三次。普通重试等待 1 秒、2 秒；429 的数字 Retry-After 最多等待 60 秒。401、403、404、410 不自动重试，不绕过访问限制。下载上限为 20 MiB，每次最多 32 个分段，分段核验长度与可用的版本标记。旧临时文件保留归档，重启时重新下载。
-
-空文件、PDF 链接返回 HTML、明显错误页面会明确拒绝。PDF 逐页提取并对低文本页执行 OCR，详见下方 PDF OCR 与检索边界。短文本只标记，不再仅因不足 500 字符直接淘汰；文本存在不代表语义充分或版式完整。提取文本绑定源文件和解析器哈希，避免复用旧正文。
-
-2026-11-25 已实测三个历史失败链接的完整下载，并通过本地 HTTP 服务测试重定向、分段、空响应、截断及临时错误。PDF 容器解析尚未完成本轮实测。
-
-### PDF OCR 与检索边界
-
-默认配置在意图合成及信息图构建前开启真实交付物联网检索，要求配置 Responses 搜索接口。缺少接口会报错。明确关闭 external_retrieval 才运行纯本地资料实验。
-
-03 只读取冻结来源，04 根据计划将原件复用、改编或合成到工作环境。后续审核、探针和教师只访问该环境，修复器在其中修复。来源目录仅挂载给 04，执行阶段强制关闭模型原生联网搜索，Docker 使用隔离网络。
-
-PDF 逐页提取文字，低于 30 个字母或数字的页面调用本地 Tesseract OCR，支持英文和简体中文。诊断记录每页处理方式与字符数。OCR 超时或缺少依赖会明确失败，全篇仍无可读正文则拒绝。原 PDF 保持不变，OCR 正文仅供来源分析。
-
-OCR 依赖已写入 docker/Dockerfile，更新代码后需重新构建所配置的运行镜像。单页渲染最长边 2400 像素，渲染限时 60 秒，OCR 限时 90 秒，单文档提取限时 1800 秒。复杂表格、手写文字和低清图片仍需质量检查，OCR 成功不代表内容准确。
-
-### Harbor 环境与任务导出
-
-新批次在探针通过及环境修复完成后、教师执行前，自动输出到 `attempt-XX/harbor/<task_id>/`。采用 Harbor schema 1.4 的任务配置。当前范围仅环境和任务，评分暂不接入，因此不生成 `tests/test.sh` 或 reward，`verifier_status` 为 `pending`，不能作为已完成评分适配的 benchmark 运行。
-
-```text
-<task_id>/
-├── task.toml
-├── instruction.md
-├── environment/
-│   ├── Dockerfile
-│   └── workspace/
-│       └── inputs/
-└── export_manifest.json
-```
-
-`instruction.md` 是 Harbor 唯一任务说明入口，来自最终工作环境中的 REQUEST.txt，并补充工作路径与网络限制。导出环境不再复制 REQUEST.txt，原管线的文件保持不变。`inputs` 保留原始字节及多种文件格式。构建上下文只包含干净任务材料，不打包教师答案、信息图、提示词、API 密钥、生成日志或评分材料。模型在 `/task` 工作，输入文件只读，成果写入 `/task/outputs`，任务环境关闭联网。Dockerfile 包含仓库中的完整运行环境安装步骤，开发机无需预先拥有本机的 workfactory/runtime 镜像。
-
-旧任务可手动导出，环境路径应指向 `status.json` 中的 `clean_environment`，有修复时选最终修复版本。导出不重新调用模型，不改旧运行记录。
-
-```bash
-python3 harbor_export.py \
-  --task-id example-task \
-  --environment /absolute/path/to/clean_environment \
-  --output /absolute/path/to/harbor/example-task
-```
-
-已完成的历史批次不会自动重新运行。导出目录不能覆盖，恢复运行会校验源文件与导出文件哈希。教师轨迹和成果仍保留在任务包外的原运行目录。未来接入评分时，可通过 `--verifier /path/to/tests` 放入明确提供的验证器，单纯复制验证器仍不等于已完成 Harbor 运行验收。
-
-格式依据 https://github.com/harbor-framework/harbor/blob/main/docs-mintlify/tasks/configuration.mdx 。本轮自动测试覆盖结构、文件完整性、答案隔离和恢复校验，未执行 Harbor 容器端到端运行。
-
-
-## 在线技能搜索与能力覆盖
-
-默认 `config/pipeline.json` 已启用 `skill_discovery`。正常运行 `batch_generate.py` 时，会在意图合成和信息图构建前完成技能发现。旧配置缺少该字段时维持原行为，需要显式加入配置以启用。无需 embedding 模型，也不需要本地技能全集。
-
-准备环境需要 Node.js 和官方 `skills@1.8.1` CLI。可在开发机执行 `npm install -g skills@1.8.1`，并确保 `skills --version` 输出 `1.8.1`。搜索和技能正文获取在编排进程执行，不在教师沙箱执行。下载的技能指令仅作为任务构造资料，不会安装或激活为编排 Agent 的技能。
-
-流程如下。
-
-1. 模型根据职业或工作素材固定工作目标，提出三种以上互补能力和三个搜索短语。
-2. 官方 CLI 分别搜索，每个查询取前五条，轮流合并去重，首轮最多检查十五条候选。
-3. 读取技能页面的完整展开正文，按内容哈希去重，保存原页面及正文。按技能 ID 加锁共享缓存，默认一天后更新。历史版本保留。
-4. 模型通常选择二至四个技能，提交正文证据、能力覆盖、必要资源与步骤依赖。程序校验能力 ID 全覆盖、引用证据存在、至少六个不同操作及四层有序依赖。模型另外检查操作是否实质不同、依赖是否真实、资源是否可提供；数量门槛不能代替语义审查。
-5. 能力不足时按缺口改写关键词，最多补搜两轮，每轮最多新增十条，累计最多检查三十五条。到上限仍不充分则拒绝该源任务，继续批次其他任务。网络或接口故障单独报错，不能算零匹配。
-6. 选中正文与工作流进入 01 意图合成，02 检查是否保留能力和复杂度，03 将必要输入及派生工作落实为信息图。探针和独立教师仍负责最终执行验证。
-
-`skills_discovery.py` 是实现入口，`prompts/skills_plan.txt` 和 `prompts/skills_review.txt` 定义两次模型调用的职责。模型沿用该源任务阶段的 `stage_models` 与 `stage_credentials`，使用现有 API 并发限流。skills CLI 的网络请求不使用模型 API。`scripts/skills_http_observer.cjs` 只观察 CLI 原有请求，识别被 CLI 隐藏的 HTTP 错误，不更换搜索服务或排序算法。
-
-每个任务的 `skill_discovery/` 保留输入、模型请求和响应、每轮关键词、CLI 原始输出和 HTTP 状态、候选完整正文、覆盖检查及接受或拒绝结果。成功检查点可复用，输入、模型或策略变化会要求使用新运行目录。数据和日志均在 Git 忽略目录，密钥仍从本地 env 文件读取。
-
-所有阈值、缓存路径、超时、CLI 路径都可在 `skill_discovery` 配置中调整。长文不截断；超过模型上下文时显式失败，不静默删去正文。当前仅保证检查流程执行，不能保证每个候选最终通过探针或教师。此改动不包含全站枚举、职业成功覆盖调度、embedding 索引或已验证的高并发吞吐。
+目录组织参考 [Terminal-Bench](https://github.com/harbor-framework/terminal-bench) 与 [EnvScaler](https://github.com/RUC-NLPIR/EnvScaler)，按本管线职责划分代码、脚本、配置与文档。

@@ -4,8 +4,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 from test_contracts import minimal_plan
-from pilot import run_stage
-from planning_agent import review_errors
+from workfactory.clients.pilot import run_stage
+from workfactory.pipeline.planning_agent import review_errors
 
 
 def response(message):
@@ -24,7 +24,7 @@ class PlanningTest(unittest.TestCase):
     def run_case(self, replies, turns):
         folder=tempfile.TemporaryDirectory();self.addCleanup(folder.cleanup)
         cfg={'OPENAI_MODEL':'fixture-model','_POLICY':{'plan_max_turns':turns}}
-        with patch('planning_agent.complete',side_effect=replies) as complete:
+        with patch('workfactory.pipeline.planning_agent.complete',side_effect=replies) as complete:
             validation, plan=run_stage('03_plan',{'task_id':'t','intent':{},'constraints':{}},Path(folder.name),cfg,1000)
         return validation,plan,Path(folder.name)/'03_plan',complete
 
@@ -60,7 +60,7 @@ class PlanningTest(unittest.TestCase):
         self.assertEqual(c.call_count,3);self.assertIsNone(p)
 
     def test_transport_failure_preserves_failure(self):
-        with tempfile.TemporaryDirectory() as d, patch('planning_agent.complete',side_effect=RuntimeError('unsupported tools')):
+        with tempfile.TemporaryDirectory() as d, patch('workfactory.pipeline.planning_agent.complete',side_effect=RuntimeError('unsupported tools')):
             with self.assertRaises(RuntimeError):
                 run_stage('03_plan',{'task_id':'t','constraints':{}},Path(d),{'OPENAI_MODEL':'x'},100)
             self.assertFalse(json.loads((Path(d)/'03_plan/validation.json').read_text())['format_and_contract_pass'])

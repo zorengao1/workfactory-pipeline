@@ -4,10 +4,10 @@ import fcntl
 from pathlib import Path
 import sys
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
-from batch_generate import run_case
-from pipeline_config import load_policy,source_cases
-from pilot import load_config,read_json
-from preflight import check_runtime
+from workfactory.pipeline.batch_generate import run_case
+from workfactory.pipeline.pipeline_config import load_policy,source_cases
+from workfactory.clients.pilot import load_config,read_json
+from workfactory.runtime.preflight import check_runtime
 
 if __name__=='__main__':
     p=argparse.ArgumentParser();p.add_argument('--config',required=True);p.add_argument('--pipeline-config',required=True);p.add_argument('--output',required=True);p.add_argument('--model',required=True);p.add_argument('--task',required=True);a=p.parse_args()

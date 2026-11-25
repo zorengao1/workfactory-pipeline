@@ -1,7 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
-from harbor_export import export_task
+from workfactory.exports.harbor_export import export_task
 
 
 class HarborExportTests(unittest.TestCase):
@@ -49,7 +49,7 @@ class HarborExportTests(unittest.TestCase):
         self.assertEqual(result['verifier_status'],'provided_not_runtime_validated')
 
     def test_resume_detects_environment_and_package_changes(self):
-        from harbor_export import ensure_task
+        from workfactory.exports.harbor_export import ensure_task
         ensure_task('sample',self.env,self.out)
         ensure_task('sample',self.env,self.out)
         (self.out/'instruction.md').write_text('modified')
@@ -57,7 +57,7 @@ class HarborExportTests(unittest.TestCase):
             ensure_task('sample',self.env,self.out)
 
     def test_resume_rejects_changed_source(self):
-        from harbor_export import ensure_task
+        from workfactory.exports.harbor_export import ensure_task
         ensure_task('sample',self.env,self.out)
         (self.env/'inputs/report.pdf').write_bytes(b'new')
         with self.assertRaisesRegex(ValueError,'export changed'):

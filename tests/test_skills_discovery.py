@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from skills_discovery import (DEFAULTS, DiscoveryRejected, full_skill_text,
+from workfactory.sources.skills_discovery import (DEFAULTS, DiscoveryRejected, full_skill_text,
                               review_errors, search_cli, enrich_skills)
 
 
@@ -66,16 +66,16 @@ class SkillDiscoveryTests(unittest.TestCase):
 
     def test_cli_http_error_not_empty_result(self):
         proc = subprocess.CompletedProcess([],0,'No skills found','WF_SEARCH '+json.dumps({'status':401,'skills':[]}))
-        with tempfile.TemporaryDirectory() as tmp, patch('skills_discovery.subprocess.run',return_value=proc):
+        with tempfile.TemporaryDirectory() as tmp, patch('workfactory.sources.skills_discovery.subprocess.run',return_value=proc):
             with self.assertRaises(RuntimeError):search_cli('test',Path(tmp),DEFAULTS)
 
     def test_cli_real_empty_and_ordered_results(self):
         proc = subprocess.CompletedProcess([],0,'No skills found','WF_SEARCH '+json.dumps({'status':200,'skills':[]}))
-        with tempfile.TemporaryDirectory() as tmp, patch('skills_discovery.subprocess.run',return_value=proc):
+        with tempfile.TemporaryDirectory() as tmp, patch('workfactory.sources.skills_discovery.subprocess.run',return_value=proc):
             self.assertEqual(search_cli('test',Path(tmp),DEFAULTS),[])
         proc.stdout = 'https://skills.sh/org/repo/b\nhttps://skills.sh/org/repo/a'
         proc.stderr = 'WF_SEARCH '+json.dumps({'status':200,'skills':[{'id':'org/repo/a'},{'id':'org/repo/b'}]})
-        with tempfile.TemporaryDirectory() as tmp, patch('skills_discovery.subprocess.run',return_value=proc):
+        with tempfile.TemporaryDirectory() as tmp, patch('workfactory.sources.skills_discovery.subprocess.run',return_value=proc):
             self.assertEqual([r['id'] for r in search_cli('test',Path(tmp),DEFAULTS)],['org/repo/b','org/repo/a'])
 
     def test_gap_search_and_checkpoint_resume(self):
@@ -86,12 +86,12 @@ class SkillDiscoveryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             config = {'OPENAI_MODEL':'test','_POLICY':{'skill_discovery':{'cache_dir':tmp}}}
             version = subprocess.CompletedProcess([],0,'1.8.1\n','')
-            with patch('skills_discovery.subprocess.run',return_value=version), patch('skills_discovery.ask',side_effect=[plan,gap,ready]), patch('skills_discovery.search_cli',side_effect=[[docs[0]],[],[],[docs[1]]]) as search, patch('skills_discovery.read_skill',side_effect=lambda r,*a:r):
+            with patch('workfactory.sources.skills_discovery.subprocess.run',return_value=version), patch('workfactory.sources.skills_discovery.ask',side_effect=[plan,gap,ready]), patch('workfactory.sources.skills_discovery.search_cli',side_effect=[[docs[0]],[],[],[docs[1]]]) as search, patch('workfactory.sources.skills_discovery.read_skill',side_effect=lambda r,*a:r):
                 result = enrich_skills(case,Path(tmp)/'run',config)
                 self.assertEqual(len(result['source_materials']),2)
                 self.assertEqual(result['source_metadata']['skill_discovery']['rounds'],2)
                 self.assertEqual(search.call_count,4)
-            with patch('skills_discovery.ask') as model:
+            with patch('workfactory.sources.skills_discovery.ask') as model:
                 self.assertEqual(result,enrich_skills(case,Path(tmp)/'run',config))
                 model.assert_not_called()
 
@@ -101,15 +101,15 @@ class SkillDiscoveryTests(unittest.TestCase):
         case = {'task_id':'test','source_materials':[], 'constraints':{}}
         with tempfile.TemporaryDirectory() as tmp:
             config = {'OPENAI_MODEL':'test','_POLICY':{'skill_discovery':{'cache_dir':tmp,'max_research_rounds':0}}}
-            with patch('skills_discovery.subprocess.run',return_value=subprocess.CompletedProcess([],0,'1.8.1','')), patch('skills_discovery.ask',side_effect=[plan,review]), patch('skills_discovery.search_cli',return_value=[]):
+            with patch('workfactory.sources.skills_discovery.subprocess.run',return_value=subprocess.CompletedProcess([],0,'1.8.1','')), patch('workfactory.sources.skills_discovery.ask',side_effect=[plan,review]), patch('workfactory.sources.skills_discovery.search_cli',return_value=[]):
                 with self.assertRaises(DiscoveryRejected):enrich_skills(case,Path(tmp)/'run',config)
             self.assertFalse((Path(tmp)/'run/enriched.json').exists())
             self.assertTrue((Path(tmp)/'run/rejected.json').exists())
 
     def test_batch_rejection_stops_before_environment(self):
-        import batch_generate
+        import workfactory.pipeline.batch_generate as batch_generate
         case = {'task_id':'t', 'stage':'01a_occupation', 'source_materials':[], 'constraints':{}}
-        with tempfile.TemporaryDirectory() as tmp, patch('skills_discovery.enrich_skills', side_effect=DiscoveryRejected('no suitable skills')), patch('batch_generate.attempt') as build:
+        with tempfile.TemporaryDirectory() as tmp, patch('workfactory.sources.skills_discovery.enrich_skills', side_effect=DiscoveryRejected('no suitable skills')), patch('workfactory.pipeline.batch_generate.attempt') as build:
             batch_generate.run_case(case, Path(tmp), {'OPENAI_MODEL':'test','OPENAI_API_KEY':'dummy','_POLICY':{'skill_discovery':{'enabled':True}}})
             build.assert_not_called()
             state=json.loads((Path(tmp)/'t/status.json').read_text())

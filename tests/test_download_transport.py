@@ -4,7 +4,7 @@ import unittest
 import urllib.error
 from pathlib import Path
 from unittest.mock import patch
-from download_transport import fetch_bytes
+from workfactory.sources.download_transport import fetch_bytes
 
 class Response(io.BytesIO):
     def __init__(self, body, status=200, headers=None):

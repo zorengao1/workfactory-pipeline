@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from source_pools import SOCParser,SkillText,balanced,related_skill_bundles,fetch,fetch_soc
+from workfactory.sources.source_pools import SOCParser,SkillText,balanced,related_skill_bundles,fetch,fetch_soc
 
 
 class SourcePoolTests(unittest.TestCase):
@@ -33,7 +33,7 @@ class SourcePoolTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             p=Path(tmp)/'source.html';p.write_text('changed')
             p.with_suffix('.html.source.json').write_text(json.dumps({'url':'https://example.org','sha256':'old'}))
-            with patch('source_pools.urllib.request.urlopen') as network:
+            with patch('workfactory.sources.source_pools.urllib.request.urlopen') as network:
                 with self.assertRaises(ValueError):fetch('https://example.org',p)
                 network.assert_not_called()
 
@@ -45,7 +45,7 @@ class SourcePoolTests(unittest.TestCase):
 
     def test_clean_checkout_can_load_bls_snapshot_without_network(self):
         with tempfile.TemporaryDirectory() as tmp:
-            with patch('source_pools.DATA',Path(tmp)), patch('source_pools.urllib.request.urlopen') as network:
+            with patch('workfactory.sources.source_pools.DATA',Path(tmp)), patch('workfactory.sources.source_pools.urllib.request.urlopen') as network:
                 records=fetch_soc()
                 self.assertEqual(len(records),1447)
                 network.assert_not_called()
