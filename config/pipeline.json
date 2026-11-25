@@ -4,6 +4,7 @@
   "api_max_concurrency": 1,
   "api_limit_scope": "model",
   "max_agent_turns": 250,
+  "plan_max_turns": 20,
   "initial_build_retries": 3,
   "repair_rounds": 3,
   "allowed_reference_formats": [],

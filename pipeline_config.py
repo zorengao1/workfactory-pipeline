@@ -10,6 +10,8 @@ def load_policy(path=None):
     for field in ('task_workers', 'api_max_concurrency', 'max_agent_turns'):
         if not isinstance(policy[field], int) or policy[field] < 1:
             raise ValueError(field+' must be a positive integer')
+    if not isinstance(policy.get('plan_max_turns',20), int) or isinstance(policy.get('plan_max_turns',20), bool) or policy.get('plan_max_turns',20) < 1:
+        raise ValueError('plan_max_turns must be a positive integer')
     for stage in policy.get('stage_models', {}):
         if stage not in STAGES:
             raise ValueError('Unknown stage '+stage)
@@ -47,5 +49,9 @@ def source_cases(policy):
 
 
 def stage_config(config, stage):
+    from pilot import load_config
+    credential_path = config.get("_POLICY", {}).get("stage_credentials", {}).get(stage)
+    if credential_path:
+        config = {**config, **load_config(credential_path)}
     model = config.get('_POLICY', {}).get('stage_models', {}).get(stage)
     return {**config, **({'OPENAI_MODEL':model} if model else {})}
