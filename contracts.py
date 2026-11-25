@@ -43,6 +43,7 @@ CARRIER = obj(id=TEXT, kind=string("request", "reference", "external", "delivera
 RELATION = obj(sources=array(TEXT, 1), target=TEXT, relation=TEXT)
 FILE = obj(id=TEXT, path=TEXT, format=TEXT, role=TEXT, node_ids=array(TEXT, 1),
            provenance=TEXT, method=string("reuse", "adapt", "synthesize"), depends_on=TEXTS)
+FILE['properties']['source_ids'] = array(TEXT, 1)
 PLAN = obj(user_request=TEXT, nodes=array(NODE, 1), carriers=array(CARRIER, 1),
            relations=array(RELATION, 1), reference_files=array(FILE),
            deliverable_requirements=array(obj(id=TEXT, description=TEXT, node_ids=array(TEXT, 1)), 1))

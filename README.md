@@ -166,3 +166,11 @@ scripts/prepare_mixed_inputs.py 从当前技能池为指定职业匹配候选技
 python3 scripts/prepare_mixed_inputs.py --occupations 13-1151.00 17-2081.00 27-3031.00 --output data/source_pools/gpt-mixed-three-timed.json
 
 config/gpt-mixed-three-timed-policy.json 是三并发示例配置。先完成来源采集，再运行 service.py 或 run_models.py。scripts/audit_run.py 根据已保存响应 ID 去重统计模型用量、原生联网调用、阶段用量和任务墙钟时间，可传入明确的单价文件计算模型费用估计。缺少单价不填写费用。scripts/watch_run_report.py 仅观察指定批次，更新报告并在批次结束后退出，不启动模型任务或安排后续批次。
+
+## 原文件复用
+
+03 接收冻结原文件目录，并可用 read_source_text 分段查阅下载文件的完整提取正文，返回读取范围和总长度。文字提取不等于已检查图表版式。适合任务的原文件可直接作为输入，围绕它做更新、审查或比较；仅作意图线索的来源继续留在构造侧。
+
+reference_files 的 reuse 和 adapt 项须填写 source_ids，绑定 source_materials 中带 snapshot 的真实文件。reuse 必须保持单份原文件及其格式，04 前由控制器直接复制，04 完成后校验 SHA256 不变。adapt 由构建者读取原件并按计划改编，记录位置及内容损失。缺失或哈希不符的原文件会报错，不自动转成合成文件。
+
+无需强制所有任务复用真实文件，也不要求模型一次读完整个文件。本次测试覆盖截断范围以后的正文读取、原文件复制、篡改拒绝、来源绑定及路径检查。真实模型自主选择 reuse 的端到端比例尚待批量验证。

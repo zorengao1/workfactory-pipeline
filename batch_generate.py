@@ -16,6 +16,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from contracts import ROOT
+from source_artifacts import stage_reuse, verify_reuse
 from continue_environment import accepted, accepted_review, prefixed
 from environment_pilot import environment, checks
 from pilot import load_config, read_json, run_stage, save
@@ -103,16 +104,20 @@ def materialize(case, plan, folder, config):
             entry={'source_id':material['source_id'],'metadata_and_text':'/sources/'+name}
             snapshot=material.get('snapshot')
             if snapshot and Path(snapshot).is_file():
-                raw=Path(snapshot);suffix='.pdf' if raw.read_bytes()[:5]==b'%PDF' else raw.suffix or '.bin'
+                raw=Path(snapshot);suffix='.pdf' if raw.read_bytes().startswith(b'%PDF-') else raw.suffix or '.bin'
                 target=sources/(f'source-{i:02d}'+suffix);shutil.copyfile(raw,target)
                 entry['original_file']='/sources/'+target.name
             manifest.append(entry)
         build_config={**config,'_CONSTRUCTION_SOURCES':str(sources.resolve())}
         try:
+            reused=stage_reuse(plan,case.get('source_materials',[]),root)
+            save(step/'reuse_manifest.json',reused)
             agent('04_build',{'task_id':case['task_id'],'plan':plan,'constraints':case['constraints'],
                 'workspace':{'root':'/task','writable_paths':['inputs','REQUEST.txt'],
                              'reference_directory':'/task/inputs','request_path':'/task/REQUEST.txt','construction_source_manifest':manifest,'construction_sources_policy':'Read-only /sources is only available to the builder. Read actual source JSON or original files before reuse/adapt. It is not copied to solver workspaces.'}},
                   root,step/'04_build',build_config,('inputs','REQUEST.txt'))
+            if not verify_reuse(reused,root):
+                raise StageRejected('Reused source file was modified during construction')
             program=checks(root,plan);save(step/'program_checks.json',program)
             if not program['exact_file_set'] or not program['nonempty'] or not program['format_match']:
                 raise StageRejected('Construction file checks failed')
