@@ -132,6 +132,9 @@ def _complete_with_retries(config, messages, max_tokens, tool_definitions=None):
 
 
 def run_stage(stage, inputs, destination, config, max_tokens):
+    if stage == "03_plan":
+        from planning_agent import run_plan
+        return run_plan(inputs, destination, config, max_tokens)
     if stage in TOOL_STAGES:
         raise ValueError("Tool execution requires a separate isolated agent harness")
     folder = destination / stage
