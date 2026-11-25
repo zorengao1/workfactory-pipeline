@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from workfactory.sources.source_pools import SOCParser,SkillText,balanced,related_skill_bundles,fetch,fetch_soc
+from workfactory.sources.source_pools import SOCParser,balanced,related_skill_bundles,fetch,fetch_soc
 
 
 class SourcePoolTests(unittest.TestCase):
@@ -15,13 +15,6 @@ class SourcePoolTests(unittest.TestCase):
         self.assertEqual(row['description'],'Represent clients.')
         self.assertEqual(row['parent_code'],'23-1010')
         self.assertNotIn('Represent',parser.records['23-0000']['title'])
-
-    def test_skill_capture_excludes_summary_and_navigation(self):
-        parser=SkillText();parser.feed('<div class="prose">summary</div><span>SKILL.md</span><div><div class="prose"><h1>Analysis</h1><div>Inputs and outputs</div></div></div><nav>footer</nav>')
-        text=''.join(parser.text)
-        self.assertIn('Inputs and outputs',text)
-        self.assertNotIn('summary',text)
-        self.assertNotIn('footer',text)
 
     def test_balanced_sampling_covers_groups_before_second_member(self):
         items=[{'soc_major':'11','id':i} for i in range(4)]+[{'soc_major':'23','id':9}]

@@ -6,7 +6,6 @@ Missing sources fail explicitly; no alternative provider is selected automatical
 import argparse
 import csv
 import hashlib
-import html
 import json
 import random
 import shutil
@@ -18,7 +17,6 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import urljoin
 
 from workfactory.paths import ROOT
 DATA=ROOT/'data/source_pools'
@@ -78,64 +76,6 @@ def fetch_onet(version):
             'attribution':'O*NET '+version+' Database, U.S. Department of Labor, Employment and Training Administration; CC BY 4.0',
             'license_url':'https://www.onetcenter.org/license_db.html','source_snapshot':str(folder.relative_to(ROOT))})
     save(DATA/'occupations.json',result)
-    return result
-
-
-class SkillText(HTMLParser):
-    def __init__(self):
-        super().__init__();self.seen_marker=False;self.depth=0;self.capture=False;self.text=[]
-    def handle_starttag(self,tag,attrs):
-        attrs=dict(attrs)
-        if self.capture and tag=='div':self.depth+=1
-        elif self.seen_marker and tag=='div' and 'prose' in attrs.get('class','').split():
-            self.capture=True;self.depth=1;self.seen_marker=False
-        if self.capture and tag in {'p','li','h1','h2','h3','pre','br','tr'}:self.text.append('\n')
-    def handle_endtag(self,tag):
-        if self.capture and tag=='div':
-            self.depth-=1
-            if self.depth==0:self.capture=False
-    def handle_data(self,data):
-        if data.strip()=='SKILL.md' and not self.text:self.seen_marker=True
-        elif self.capture:self.text.append(data)
-
-
-def skill_links(body):
-    return list(dict.fromkeys(html.unescape(x) for x in re.findall(r'href=["\']([^"\']+)',body)
-        if re.fullmatch(r'/[^/?]+/[^/?]+/[^/?]+',x) and not x.startswith('/site/')))
-
-
-def fetch_skills(limit,per_repo):
-    snapshot=DATA/'skills-sh/raw'
-    catalogs=json.loads((ROOT/'config/source-pools.json').read_text())['skills_catalogs']
-    links=[]
-    for url in catalogs:
-        name='index' if url.rstrip('/')=='https://www.skills.sh' else 'catalog-'+url.rstrip('/').rsplit('/',1)[-1]
-        links.extend(skill_links(fetch(url,snapshot/(name+'.html')).decode()))
-    repositories=defaultdict(list)
-    for link in dict.fromkeys(links):repositories['/'.join(link.split('/')[1:3])].append(link)
-    selected=[]
-    for index in range(per_repo):
-        for entries in repositories.values():
-            if index<len(entries):selected.append(entries[index])
-            if len(selected)>=limit:break
-        if len(selected)>=limit:break
-    if not selected:raise ValueError('No skill entries discovered in skills.sh directory')
-    def one(link):
-        parts=link.strip('/').split('/');slug='__'.join(parts)
-        body=fetch('https://www.skills.sh'+link,snapshot/(slug+'.html')).decode()
-        from workfactory.sources.skills_discovery import full_skill_text
-        text=full_skill_text(body)
-        if not text:raise ValueError('No rendered SKILL.md body '+link)
-        github=list(dict.fromkeys(re.findall(r'href="(https://github.com/[^"?#]+)',body)))
-        return {'source_id':'skills-sh-'+slug,'name':parts[-1],'repository':'/'.join(parts[:2]),
-            'url':'https://www.skills.sh'+link,'repository_url':github[0] if github else None,
-            'content':text,'eligible_for_composition':len(text)>=300,'sha256':hashlib.sha256(text.encode()).hexdigest(),
-            'source_snapshot':str((snapshot/(slug+'.html')).relative_to(ROOT)),
-            'representation':'Rendered SKILL.md documentation from skills.sh, not an installed skill',
-            'license':'Upstream license not inferred; consult original repository'}
-    # Stop on missing docs rather than replace them with descriptions or synthetic skills.
-    with ThreadPoolExecutor(4) as pool:result=list(pool.map(one,selected))
-    save(DATA/'skills.json',result)
     return result
 
 
@@ -264,9 +204,6 @@ def main():
     p=argparse.ArgumentParser(description=__doc__);sub=p.add_subparsers(dest='action',required=True)
     a=sub.add_parser('fetch-onet');a.add_argument('--version',default=settings['onet_version'])
     a=sub.add_parser('fetch-skills')
-    a.add_argument('--backend',choices=['cli','html'],default=settings.get('skills_backend','html'))
-    a.add_argument('--limit',type=int,default=settings['skills_limit'],help='HTML backend only')
-    a.add_argument('--per-repo',type=int,default=settings['skills_per_repository'],help='HTML backend only')
     a.add_argument('--repository',action='append',help='CLI GitHub owner/repository; repeat for multiple repositories')
     a.add_argument('--cli',default='skills');a.add_argument('--refresh',action='store_true')
     a.add_argument('--output',type=Path,default=DATA/'skills.json')
@@ -275,14 +212,9 @@ def main():
     args=p.parse_args()
     if args.action=='fetch-onet':print('Occupation records',len(fetch_onet(args.version)))
     elif args.action=='fetch-skills':
-        if args.backend=='cli':
-            from workfactory.sources.skills_cli_source import collect_skills
-            result=collect_skills(args.repository or settings.get('skills_repositories',[]),DATA,args.output,
-                args.cli,settings.get('skills_cli_version','1.8.1'),args.refresh)
-        else:
-            if args.refresh or args.repository:raise ValueError('refresh and repository options require CLI backend')
-            result=fetch_skills(args.limit,args.per_repo)
-            if args.output!=DATA/'skills.json':save(args.output,result)
+        from workfactory.sources.skills_cli_source import collect_skills
+        result=collect_skills(args.repository or settings.get('skills_repositories',[]),DATA,args.output,
+            args.cli,settings.get('skills_cli_version','1.8.1'),args.refresh)
         print('Skill documents',len(result))
     elif args.action=='fetch-soc':print('SOC records',len(fetch_soc(args.import_html)))
     else:print(json.dumps(build_cases(args.occupations,args.skill_cases,args.seed),indent=2))

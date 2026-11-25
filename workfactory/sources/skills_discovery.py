@@ -78,7 +78,7 @@ class PageText(HTMLParser):
 
 
 def full_skill_text(html):
-    """Read preview AND restHtml from public Next.js page data, without running JS."""
+    """Assemble one complete skill body from the two Next.js page fields."""
     chunks = []
     for match in re.finditer(r'self\.__next_f\.push\((.*?)\)</script>', html, re.S):
         try:

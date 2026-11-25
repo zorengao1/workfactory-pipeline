@@ -61,7 +61,7 @@ python3 scripts/check_environment.py
 python3 -m unittest discover -s tests -v
 ```
 
-config/source-pools.json 控制 O*NET 版本、技能仓库、采集后端与抽样参数。CLI 默认采集所列仓库的全部技能，不使用网页后端的 96 个总量和每仓库 6 个限制。新增仓库需加入 skills_repositories。该配置覆盖指定仓库，并非全站遍历。下载文件保存 URL、获取时间和 SHA256，缓存改变会明确报错。职业候选按 SOC 大类轮流排列，技能候选先抽取入口锚点；默认批量管线再通过在线 skills CLI 搜索互补技能，并由模型检查正文、覆盖和实际输入输出关系。该抽样方式没有复刻论文的频率分布。
+config/source-pools.json 控制 O*NET 版本、技能仓库、采集后端与抽样参数。CLI 默认采集所列仓库的全部技能。新增仓库需加入 skills_repositories。该配置覆盖指定仓库，并非全站遍历。下载文件保存 URL、获取时间和 SHA256，缓存改变会明确报错。职业候选按 SOC 大类轮流排列，技能候选先抽取入口锚点；默认批量管线再通过在线 skills CLI 搜索互补技能，并由模型检查正文、覆盖和实际输入输出关系。该抽样方式没有复刻论文的频率分布。
 
 技能池更新采用显式命令。首次采集需要联网，缓存复用不需要搜索或模型 API。缺少 CLI、下载失败或缓存被改动时明确停止，不自动切换后端。更新来源后应创建新的批次，不覆盖正在运行的任务。
 
@@ -76,7 +76,7 @@ python3 -m workfactory.sources.source_pools fetch-skills --refresh
 python3 -m workfactory.sources.source_pools build
 ```
 
-原网页采集代码保留，可显式选择 fetch-skills --backend html。默认不会自动回退到网页采集。
+旧版网页目录采集入口已移除。fetch-skills 仅使用 CLI 下载入口技能素材；批量生成时另由在线 CLI 搜索互补技能，读取正文后交给模型筛选。
 
 data/source_pools/statistics.json 给出原素材和候选输入规模。当前快照统计见 docs/SOURCE_POOL_STATISTICS.json。候选输入数量不等于已生成环境或已验收轨迹数量。
 

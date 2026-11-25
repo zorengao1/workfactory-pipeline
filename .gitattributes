@@ -1,2 +1,5 @@
 # Preserve the exact bytes and hash of the official source snapshot.
 resources/soc-2018/*.html -text -whitespace
+
+# Official source data is retained but excluded from language statistics.
+resources/soc-2018/*.html linguist-vendored=true
