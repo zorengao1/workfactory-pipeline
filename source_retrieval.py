@@ -184,7 +184,7 @@ def enrich_case(case,folder,config):
         {'source_id':source_id,'provenance':research['publisher']+'; '+metadata['url'],
          'title':research['deliverable_title'],'url':metadata['url'],'sha256':metadata['sha256'],
          'snapshot':str(candidate/'artifact'),**text_metadata(candidate/'artifact.txt',body),
-         'use':'Preview only; full original and extracted text remain available. Prefer task-appropriate reuse, then adapt, then synthesize missing inputs. Prior deliverables may support review, update or comparison; do not leak the new task answer.'}]
+         'use':'Complete extracted text is supplied; original file remains available. Prefer task-appropriate reuse, then adapt, then synthesize missing inputs. Prior deliverables may support review, update or comparison; do not leak the new task answer.'}]
     result['source_metadata']={**result.get('source_metadata',{}),'mixed_inputs':['occupation','skills','web_context','real_deliverable'],
                                'retrieval_folder':str(folder),'web_source_urls':urls}
     result['constraints']['scope']=result['constraints'].get('scope','').replace('Do not claim web retrieval.','')

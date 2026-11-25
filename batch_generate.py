@@ -42,11 +42,17 @@ def update(folder, **fields):
 
 def text_stage(stage, inputs, folder, config):
     config=stage_config(config,stage)
+    full_intent = stage in ('01a_occupation','01b_skill','01c_deliverable','02_intent_review')
+    if full_intent:
+        from source_artifacts import full_text_inputs
+        inputs = full_text_inputs(inputs)
     existing=folder/stage
     for cached in [existing,*sorted(folder.glob(f'{stage}-retry-*/{stage}'))]:
         if (cached/'validation.json').exists():
             valid=read_json(cached/'validation.json')
             if valid['format_and_contract_pass'] and valid['status']=='ok':
+                if full_intent and (not (cached/'input.json').exists() or read_json(cached/'input.json') != inputs):
+                    raise ValueError('Cached intent input differs or predates full-text access; use a new output directory')
                 return read_json(cached/'parsed.json')['result']
     dest=folder
     if existing.exists():

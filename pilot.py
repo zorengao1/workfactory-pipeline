@@ -137,8 +137,12 @@ def run_stage(stage, inputs, destination, config, max_tokens):
         return run_plan(inputs, destination, config, max_tokens)
     if stage in TOOL_STAGES:
         raise ValueError("Tool execution requires a separate isolated agent harness")
+    if stage in ('01a_occupation', '01b_skill', '01c_deliverable', '02_intent_review'):
+        from source_artifacts import full_text_inputs
+        inputs = full_text_inputs(inputs)
     folder = destination / stage
     folder.mkdir()
+    save(folder / 'input.json', inputs)
     messages = render(stage, inputs)
     save(folder / "request.json", {"model": config["OPENAI_MODEL"], "messages": messages,
          "max_tokens": max_tokens})

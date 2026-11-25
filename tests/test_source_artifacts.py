@@ -47,9 +47,9 @@ class ArtifactTest(unittest.TestCase):
         from source_artifacts import text_metadata, search_source
         text='x'*120000+'unique evidence'
         meta=text_metadata(self.root/'artifact.txt',text)
-        self.assertTrue(meta['content_is_preview'])
+        self.assertFalse(meta['content_is_preview'])
         self.assertFalse(meta['extraction_truncated'])
-        self.assertEqual(len(meta['content']),12000)
+        self.assertEqual(meta['content'],text)
         self.materials[0].update(meta)
         catalog=artifacts(self.materials)
         match=search_source(catalog,'report','unique evidence')['matches'][0]
@@ -57,3 +57,34 @@ class ArtifactTest(unittest.TestCase):
         self.assertIn('unique evidence',read_source(catalog,'report',match['start'],1000)['text'])
         (self.root/'artifact.txt').write_text('changed')
         with self.assertRaises(ValueError):artifacts(self.materials)
+
+    def test_legacy_preview_restored_without_changing_input(self):
+        from source_artifacts import full_text_inputs
+        inputs={'source_materials':self.materials}
+        result=full_text_inputs(inputs)
+        self.assertTrue(result['source_materials'][0]['content'].endswith('late page evidence'))
+        self.assertEqual(inputs['source_materials'][0]['content'],'excerpt')
+
+    def test_unrecoverable_preview_rejected(self):
+        from source_artifacts import full_text_inputs
+        with self.assertRaisesRegex(ValueError,'Full source text required'):
+            full_text_inputs({'source_materials':[{'source_id':'old','content':'excerpt','content_is_preview':True}]})
+
+    def test_intent_and_review_requests_contain_tail(self):
+        from unittest.mock import patch
+        from pilot import run_stage
+        for stage in ('01a_occupation','01b_skill','01c_deliverable','02_intent_review'):
+            dest=self.root/stage;dest.mkdir()
+            with patch('pilot.render',side_effect=lambda stage,inputs:[{'role':'user','content':inputs['source_materials'][0]['content']}]), patch('pilot.complete',side_effect=RuntimeError('stop before paid API')) as api:
+                with self.assertRaisesRegex(RuntimeError,'stop before paid API'):
+                    run_stage(stage,{'source_materials':self.materials},dest,{'OPENAI_MODEL':'test','OPENAI_API_KEY':'test'},100)
+            self.assertIn('late page evidence',api.call_args.args[1][0]['content'])
+
+    def test_cached_preview_result_cannot_bypass_full_input(self):
+        import json
+        from batch_generate import text_stage
+        stage=self.root/'01c_deliverable';stage.mkdir()
+        (stage/'validation.json').write_text(json.dumps({'format_and_contract_pass':True,'status':'ok'}))
+        (stage/'parsed.json').write_text(json.dumps({'result':{}}))
+        with self.assertRaisesRegex(ValueError,'use a new output directory'):
+            text_stage('01c_deliverable',{'source_materials':self.materials},self.root,{},)

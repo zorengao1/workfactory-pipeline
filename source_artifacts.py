@@ -81,11 +81,11 @@ def verify_reuse(records, root):
     return all((Path(root)/r['path']).is_file() and digest(Path(root)/r['path'])==r['sha256'] for r in records)
 
 
-def text_metadata(path, body, preview_chars=12000):
-    """Keep full extraction on disk; explicitly label the initial context preview."""
+def text_metadata(path, body):
+    """Keep full extraction both on disk and in model input."""
     path=Path(path)
     path.write_text(body)
-    return {'content':body[:preview_chars], 'content_is_preview':len(body)>preview_chars,
+    return {'content':body, 'content_is_preview':False,
             'full_text_path':str(path.resolve()), 'full_text_sha256':digest(path),
             'extraction_total_characters':len(body), 'extraction_truncated':False}
 
@@ -105,3 +105,26 @@ def search_source(catalog, source_id, query, start=0, limit=10):
         cursor=pos+len(query)
     return {'source_id':source_id,'matches':hits,'next_start':cursor if len(hits)==limit else None,
             'total_characters':len(body),'matching':'case-sensitive literal text','scope':'extracted text only'}
+
+
+def full_text_inputs(inputs):
+    """Restore legacy previews before intent generation/review; never modify sources."""
+    import copy
+    result = copy.deepcopy(inputs)
+    materials = result.get('source_materials', [])
+    catalog = artifacts(materials)
+    for source in materials:
+        sid = source.get('source_id')
+        path = source.get('full_text_path') or catalog.get(sid, {}).get('text_path')
+        if path:
+            path = Path(path)
+            if not path.is_file():
+                raise ValueError('Missing full source text ' + str(sid))
+            if source.get('full_text_sha256') and digest(path) != source['full_text_sha256']:
+                raise ValueError('Full text hash mismatch ' + str(sid))
+            body = path.read_text()
+            source.update(content=body, content_is_preview=False,
+                          extraction_total_characters=len(body), extraction_truncated=False)
+        elif source.get('content_is_preview') or source.get('extraction_truncated'):
+            raise ValueError('Full source text required for intent stage ' + str(sid))
+    return result
