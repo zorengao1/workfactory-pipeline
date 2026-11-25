@@ -9,6 +9,7 @@ import json
 import re
 import subprocess
 import urllib.request
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from pilot import complete, save
@@ -38,25 +39,13 @@ def parse_research(text):
     return result
 
 
-EXTRACTOR=r'''
+EXTRACTOR=Path(__file__).with_name('pdf_extraction.py').read_text() + '\n' + r'''
 import json,sys,zipfile,xml.etree.ElementTree as E
 from pathlib import Path
 from html.parser import HTMLParser
 p=Path('/source/artifact');b=p.read_bytes()
 if b.startswith(b'%PDF'):
- from pypdf import PdfReader
- r=PdfReader(p)
- if r.is_encrypted and not r.decrypt(''):
-  raise ValueError('encrypted_pdf: password required')
- pages=[];empty=[]
- for i,page in enumerate(r.pages):
-  content=page.extract_text() or ''
-  if sum(c.isalnum() for c in content)<30:empty.append(i+1)
-  pages.append('PAGE '+str(i+1)+'\n'+content)
- print(json.dumps({'pdf_pages':len(pages),'low_text_pages':empty,'ocr_performed':False}),file=sys.stderr)
- if len(empty)==len(pages):
-  raise ValueError('pdf_no_text: possible scanned document; OCR or inspection required')
- t='\n'.join(pages)
+ t=extract_pdf(p,sys.stderr)
 elif zipfile.is_zipfile(p):
  with zipfile.ZipFile(p) as z:
   names=[n for n in z.namelist() if n.startswith(('word/','ppt/slides/','xl/worksheets/','xl/sharedStrings')) and n.endswith('.xml')]
@@ -111,7 +100,7 @@ def download_deliverable(url, folder, image):
     except ValueError as exc:
         save(folder/'extraction_diagnostic.json',{'status':'rejected','reason':str(exc)})
         raise
-    extraction_key=hashlib.sha256((metadata['sha256']+EXTRACTOR).encode()).hexdigest()
+    extraction_key=hashlib.sha256((metadata['sha256']+EXTRACTOR+image).encode()).hexdigest()
     valid_text=False
     if text.exists() and text_meta.exists():
         tm=json.loads(text_meta.read_text())
@@ -120,8 +109,15 @@ def download_deliverable(url, folder, image):
         if text.exists():
             import time
             text.rename(folder/('artifact.previous-'+str(time.time_ns())+'.txt'))
-        result=subprocess.run(['docker','run','--rm','--network','none','--memory','512m','--cpus','1',
-            '--mount',f'type=bind,src={folder.resolve()},dst=/source,readonly',image,'python','-c',EXTRACTOR],capture_output=True,text=True,timeout=120,check=False)
+        container_name = 'workfactory-extract-' + uuid.uuid4().hex
+        try:
+            result=subprocess.run(['docker','run','--rm','--name',container_name,'--network','none','--memory','512m','--cpus','1',
+                '--mount',f'type=bind,src={folder.resolve()},dst=/source,readonly',image,'python','-c',EXTRACTOR],capture_output=True,text=True,timeout=1800,check=False)
+        except subprocess.TimeoutExpired as exc:
+            subprocess.run(['docker','rm','-f',container_name], capture_output=True, timeout=30, check=False)
+            save(folder/'extraction_diagnostic.json', {'status':'rejected', 'reason':'extraction_timeout', 'timeout_seconds':1800})
+            raise ValueError('extraction_timeout: see extraction_diagnostic.json') from exc
+        (folder/'extraction_pages.jsonl').write_text(result.stderr)
         diagnostic={'returncode':result.returncode,'stderr':result.stderr[-8000:]}
         try:
             if result.returncode:

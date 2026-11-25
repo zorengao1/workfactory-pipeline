@@ -36,12 +36,13 @@ def source_cases(policy):
         constraints = {
             'allowed_reference_formats':policy['allowed_reference_formats'],
             'required_deliverable_formats':policy['required_deliverable_formats'],
-            'external_retrieval':policy['external_retrieval'],
+            'external_retrieval':False,
             'purpose':'按工作意图和信息支撑图决定参考文件数量与格式，不凑数量，不强制表格。'
                       'allowed_reference_formats 为空表示不限定后缀，须使用执行环境实际可处理的格式。'
                       '保留来源标注，明确合成内容。所有必要前提可见，派生结果留给求解者。'
                       '请求固定为根目录 REQUEST.txt，参考文件放 inputs，成果放 outputs。',
             **case.get('constraints', {})}
+        constraints['external_retrieval'] = False
         if policy.get('reference_file_count') is not None:
             constraints['reference_file_count'] = policy['reference_file_count']
         case['constraints'] = constraints
@@ -54,4 +55,4 @@ def stage_config(config, stage):
     if credential_path:
         config = {**config, **load_config(credential_path)}
     model = config.get('_POLICY', {}).get('stage_models', {}).get(stage)
-    return {**config, **({'OPENAI_MODEL':model} if model else {})}
+    return {**config, **({'OPENAI_MODEL':model} if model else {}), 'NATIVE_WEB_SEARCH': '0'}

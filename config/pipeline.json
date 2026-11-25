@@ -10,7 +10,7 @@
   "allowed_reference_formats": [],
   "required_deliverable_formats": [],
   "reference_file_count": null,
-  "external_retrieval": false,
+  "external_retrieval": true,
   "source_cases": "data/source_pools/cases.json",
   "stage_models": {},
   "runtime": {
@@ -25,5 +25,9 @@
     "memory": "2g",
     "cpus": 1,
     "command_timeout_seconds": 120
+  },
+  "retrieval": {
+    "backend": "responses_web_search",
+    "candidate_attempts": 3
   }
 }
