@@ -45,7 +45,18 @@ from html.parser import HTMLParser
 p=Path('/source/artifact');b=p.read_bytes()
 if b.startswith(b'%PDF'):
  from pypdf import PdfReader
- r=PdfReader(p);t='\n'.join('PAGE '+str(i+1)+'\n'+(x.extract_text() or '') for i,x in enumerate(r.pages))
+ r=PdfReader(p)
+ if r.is_encrypted and not r.decrypt(''):
+  raise ValueError('encrypted_pdf: password required')
+ pages=[];empty=[]
+ for i,page in enumerate(r.pages):
+  content=page.extract_text() or ''
+  if sum(c.isalnum() for c in content)<30:empty.append(i+1)
+  pages.append('PAGE '+str(i+1)+'\n'+content)
+ print(json.dumps({'pdf_pages':len(pages),'low_text_pages':empty,'ocr_performed':False}),file=sys.stderr)
+ if len(empty)==len(pages):
+  raise ValueError('pdf_no_text: possible scanned document; OCR or inspection required')
+ t='\n'.join(pages)
 elif zipfile.is_zipfile(p):
  with zipfile.ZipFile(p) as z:
   names=[n for n in z.namelist() if n.startswith(('word/','ppt/slides/','xl/worksheets/','xl/sharedStrings')) and n.endswith('.xml')]
@@ -64,47 +75,25 @@ print(t)
 '''
 
 
-def fetch_bytes(url,folder):
-    partial=folder/'download.part';parts=partial.read_bytes() if partial.exists() else b''
-    total=None;last_headers={};resolved=url
-    for attempt in range(1,33):
-        offset=len(parts)
-        request=urllib.request.Request(url,headers={'User-Agent':'WorkFactoryResearch/1.0','Range':f'bytes={offset}-{offset+1048575}'})
-        with urllib.request.urlopen(request,timeout=90) as response:
-            resolved=response.geturl();last_headers=dict(response.headers)
-            cr=response.headers.get('Content-Range')
-            if cr:
-                match=re.fullmatch(r'bytes (\d+)-(\d+)/(\d+)',cr)
-                if not match or int(match[1])!=offset:raise ValueError('Unexpected HTTP range '+str(cr))
-                total=int(match[3])
-            elif response.status==200:
-                if offset:parts=b'';offset=0
-                length=response.headers.get('Content-Length');total=int(length) if length else None
-            else:raise ValueError('Unsupported download response '+str(response.status))
-            if total and total>20*1024*1024:raise ValueError('Deliverable exceeds 20 MiB')
-            received=[]
-            while True:
-                chunk=response.read(65536)
-                if not chunk:break
-                received.append(chunk)
-                if offset+sum(map(len,received))>20*1024*1024:raise ValueError('Deliverable exceeds 20 MiB')
-            body=b''.join(received)
-            if not body:raise ValueError('Download made no progress')
-            parts+=body;partial.write_bytes(parts)
-            with (folder/'download_events.jsonl').open('a') as log:
-                log.write(json.dumps({'attempt':attempt,'offset':offset,'received':len(body),'total':total,'content_range':cr})+'\n')
-            if total is None or len(parts)==total:return parts,resolved,last_headers,total
-            if len(parts)>total:raise ValueError('Download exceeds declared length')
-    raise ValueError('Incomplete HTTP download after 32 range requests')
+from download_transport import fetch_bytes
+from extraction_quality import preflight, text_quality
 
 
 def download_deliverable(url, folder, image):
+    folder=Path(folder);folder.mkdir(parents=True,exist_ok=True)
     artifact=folder/'artifact';meta=folder/'artifact.source.json';text=folder/'artifact.txt'
+    text_meta=folder/'artifact.text.source.json'
     if meta.exists():
         metadata=json.loads(meta.read_text())
         if metadata['url']!=url or not artifact.exists() or hashlib.sha256(artifact.read_bytes()).hexdigest()!=metadata['sha256']:
             raise ValueError('Deliverable snapshot changed or cache corrupt')
-        if artifact.read_bytes().startswith(b'%PDF') and b'%%EOF' not in artifact.read_bytes()[-2048:]:
+        cached_bytes=artifact.read_bytes()
+        try:
+            preflight(cached_bytes,url,metadata.get('content_type'))
+            invalid=False
+        except ValueError:
+            invalid=True
+        if invalid or (cached_bytes.startswith(b'%PDF') and b'%%EOF' not in cached_bytes[-2048:]):
             # Retain the truncated bytes and their manifest before downloading the same URL again.
             for index in range(1,100):
                 old=folder/f'artifact.partial-{index:02d}'
@@ -114,12 +103,38 @@ def download_deliverable(url, folder, image):
         body,resolved,headers,expected=fetch_bytes(url,folder)
         metadata={'url':url,'resolved_url':resolved,'content_type':headers.get('Content-Type'),
                   'retrieved_at':datetime.now(timezone.utc).isoformat(),'sha256':hashlib.sha256(body).hexdigest(),'bytes':len(body),'content_length':expected}
+        save(folder/'download_observation.json', metadata)
+        preflight(body,url,metadata.get('content_type'))
         artifact.write_bytes(body);save(meta,metadata)
-    if not text.exists():
+    try:
+        preflight(artifact.read_bytes(),url,metadata.get('content_type'))
+    except ValueError as exc:
+        save(folder/'extraction_diagnostic.json',{'status':'rejected','reason':str(exc)})
+        raise
+    extraction_key=hashlib.sha256((metadata['sha256']+EXTRACTOR).encode()).hexdigest()
+    valid_text=False
+    if text.exists() and text_meta.exists():
+        tm=json.loads(text_meta.read_text())
+        valid_text=tm.get('key')==extraction_key and tm.get('text_sha256')==hashlib.sha256(text.read_bytes()).hexdigest()
+    if not valid_text:
+        if text.exists():
+            import time
+            text.rename(folder/('artifact.previous-'+str(time.time_ns())+'.txt'))
         result=subprocess.run(['docker','run','--rm','--network','none','--memory','512m','--cpus','1',
-            '--mount',f'type=bind,src={folder.resolve()},dst=/source,readonly',image,'python','-c',EXTRACTOR],capture_output=True,text=True,timeout=120,check=True)
-        if len(result.stdout.strip())<500:raise ValueError('Downloaded deliverable has insufficient readable text')
+            '--mount',f'type=bind,src={folder.resolve()},dst=/source,readonly',image,'python','-c',EXTRACTOR],capture_output=True,text=True,timeout=120,check=False)
+        diagnostic={'returncode':result.returncode,'stderr':result.stderr[-8000:]}
+        try:
+            if result.returncode:
+                raise ValueError('extraction_failed: see extraction_diagnostic.json')
+            diagnostic.update(text_quality(result.stdout))
+        except ValueError as exc:
+            diagnostic.update(status='rejected',reason=str(exc))
+            save(folder/'extraction_diagnostic.json',diagnostic)
+            raise
+        diagnostic['status']='extracted'
+        save(folder/'extraction_diagnostic.json',diagnostic)
         text.write_text(result.stdout)
+        save(text_meta,{'key':extraction_key,'text_sha256':hashlib.sha256(text.read_bytes()).hexdigest()})
     return metadata,text.read_text()
 
 
