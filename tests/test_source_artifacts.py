@@ -42,3 +42,18 @@ class ArtifactTest(unittest.TestCase):
     def test_missing_full_text_does_not_silently_use_excerpt(self):
         (self.root/'artifact.txt').unlink()
         with self.assertRaises(ValueError):read_source(artifacts(self.materials),'report')
+
+    def test_preview_preserves_full_text_and_searches_tail(self):
+        from source_artifacts import text_metadata, search_source
+        text='x'*120000+'unique evidence'
+        meta=text_metadata(self.root/'artifact.txt',text)
+        self.assertTrue(meta['content_is_preview'])
+        self.assertFalse(meta['extraction_truncated'])
+        self.assertEqual(len(meta['content']),12000)
+        self.materials[0].update(meta)
+        catalog=artifacts(self.materials)
+        match=search_source(catalog,'report','unique evidence')['matches'][0]
+        self.assertEqual(match['match_start'],120000)
+        self.assertIn('unique evidence',read_source(catalog,'report',match['start'],1000)['text'])
+        (self.root/'artifact.txt').write_text('changed')
+        with self.assertRaises(ValueError):artifacts(self.materials)
