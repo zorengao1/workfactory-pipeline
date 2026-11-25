@@ -19,10 +19,14 @@ def artifacts(materials):
         actual = digest(path)
         if source.get('sha256') and source['sha256'] != actual:
             raise ValueError('Source snapshot hash mismatch ' + source['source_id'])
-        text = path.with_suffix('.txt')
+        text = Path(source['full_text_path']) if source.get('full_text_path') else path.with_suffix('.txt')
+        if source.get('full_text_sha256') and (not text.is_file() or digest(text)!=source['full_text_sha256']):
+            raise ValueError('Full text hash mismatch '+source['source_id'])
         result[source['source_id']] = {
             'source_id':source['source_id'], 'path':str(path), 'sha256':actual,
             'text_path':str(text) if text.is_file() else None,
+            'total_characters':len(text.read_text()) if text.is_file() else None,
+            'full_text_available':text.is_file(),
             'format':'pdf' if path.read_bytes().startswith(b'%PDF-') else path.suffix.lstrip('.'),
             'provenance':source.get('provenance',''),
             'excerpt':source.get('content',''),
@@ -75,3 +79,29 @@ def stage_reuse(plan, materials, root):
 
 def verify_reuse(records, root):
     return all((Path(root)/r['path']).is_file() and digest(Path(root)/r['path'])==r['sha256'] for r in records)
+
+
+def text_metadata(path, body, preview_chars=12000):
+    """Keep full extraction on disk; explicitly label the initial context preview."""
+    path=Path(path)
+    path.write_text(body)
+    return {'content':body[:preview_chars], 'content_is_preview':len(body)>preview_chars,
+            'full_text_path':str(path.resolve()), 'full_text_sha256':digest(path),
+            'extraction_total_characters':len(body), 'extraction_truncated':False}
+
+
+def search_source(catalog, source_id, query, start=0, limit=10):
+    if not isinstance(query,str) or not query.strip() or not isinstance(start,int) or start<0 or not isinstance(limit,int) or not 1<=limit<=20:
+        raise ValueError('Invalid search arguments')
+    item=catalog[source_id]
+    if not item['text_path']:
+        raise ValueError('Full extracted text unavailable')
+    body=Path(item['text_path']).read_text();hits=[];cursor=start
+    while len(hits)<limit:
+        pos=body.find(query,cursor)
+        if pos<0:break
+        lo=max(0,pos-150);hi=min(len(body),pos+len(query)+250)
+        hits.append({'match_start':pos,'start':lo,'end':hi,'text':body[lo:hi]})
+        cursor=pos+len(query)
+    return {'source_id':source_id,'matches':hits,'next_start':cursor if len(hits)==limit else None,
+            'total_characters':len(body),'matching':'case-sensitive literal text','scope':'extracted text only'}

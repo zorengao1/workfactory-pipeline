@@ -1,3 +1,4 @@
+from source_artifacts import text_metadata
 """Freeze native GPT web research and a downloaded deliverable before synthesis.
 
 Search is confined to source preparation. Probes and teachers see only the
@@ -171,13 +172,12 @@ def enrich_case(case,folder,config):
         'content':research['professional_context'],'urls':urls},
         {'source_id':source_id,'provenance':research['publisher']+'; '+metadata['url'],
          'title':research['deliverable_title'],'url':metadata['url'],'sha256':metadata['sha256'],
-         'snapshot':str(candidate/'artifact'),'content':body[:100000],
-         'extraction_total_characters':len(body),'extraction_truncated':len(body)>100000,
-         'use':'Evidence for intended audience, operations, and deliverable structure. Do not give an existing solution as the new task answer.'}]
+         'snapshot':str(candidate/'artifact'),**text_metadata(candidate/'artifact.txt',body),
+         'use':'Preview only; full original and extracted text remain available. Prefer task-appropriate reuse, then adapt, then synthesize missing inputs. Prior deliverables may support review, update or comparison; do not leak the new task answer.'}]
     result['source_metadata']={**result.get('source_metadata',{}),'mixed_inputs':['occupation','skills','web_context','real_deliverable'],
                                'retrieval_folder':str(folder),'web_source_urls':urls}
     result['constraints']['scope']=result['constraints'].get('scope','').replace('Do not claim web retrieval.','')
-    result['constraints']['scope']+=' Combine occupational duties, only genuinely applicable supplied skills, and the inspected real deliverable into one coherent intent. Explain actual skill input/output links; do not force unrelated skills. Use the real artifact as an intent cue. Mark new business data as synthetic, distinguish organizations, periods and evidence. Keep all solver premises in materialized files.'
+    result['constraints']['scope']+=' Combine occupational duties, only genuinely applicable supplied skills, and the inspected real deliverable into one coherent intent. Explain actual skill input/output links; do not force unrelated skills. First assess the real artifact as a reusable task input. Prefer reuse when relevant, adapt when changes are needed, and synthesize missing inputs. A preview is not the complete source; inspect relevant full-text ranges during planning. Do not force unrelated files into the task. Mark new business data as synthetic, distinguish organizations, periods and evidence. Keep all solver premises in materialized files.'
     result['constraints']['external_retrieval']=False
     result['constraints']['retrieval_scope']='Source preparation completed and frozen; solver uses supplied files only.'
     save(cached,result)

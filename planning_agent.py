@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 from pilot import complete
 from contracts import PLAN, output_errors, ROOT
-from source_artifacts import artifacts, read_source, binding_errors
+from source_artifacts import artifacts, read_source, search_source, binding_errors
 
 
 def save(p, x):
@@ -69,6 +69,7 @@ def run_plan(inputs, destination, config, max_tokens):
     policy += '''\n由你自主决定规划顺序，无03A到03E的强制子阶段。你可直接设计整个计划、局部更新、检查、请求独立审核。业务合理的重复信息、不同版本、重叠文件和有背景的冗余允许保留，不为去重删除有用的核对材料；冲突必须有可判断的来源、日期、生效规则或合理的未决处理。职业资料通常留在构造侧。只规划，不生成04真实文件。使用工具保存计划和提交。save_plan接受完整六块计划；update_plan按顶层字段整体替换，只传需要改的字段。check_plan检查结构。review_plan独立评审当前版本。submit_plan只接受当前版本结构通过且独立审核通过的计划。版本修改后原审核失效。不要输出长段计划到普通文本，使用工具。达到控制器轮数上限仍不通过则保留失败。'''
     policy += '\n任何影响数值、可核对性或需要猜测的歧义必须修复才能提交。纯风格建议可保留。对审核问题修订相关节点和构建规格，保持所有表述一致。修订后必须再次独立审核，确认旧问题关闭且没有新的实质问题。达到轮数上限仍未通过则以needs_repair停止，不能作为成功提交。'
     policy += '\n输入正文可能只是摘录。source_artifact_catalog列出已下载原文件。可调用read_source_text分段查看完整提取正文，无需一次读完整文档；必须注明实际查阅范围，不能声称看过未读取页面或图像。针对原文件已有内容设计审查、更新或比较任务，允许原文件自身的结论作为背景，只禁止直接提供当前任务的目标答案。逐个评估原文件的业务用途，适用时在reference_files指定reuse或adapt并填写source_ids。reuse保持原文件字节和格式，由构建器复制；adapt说明使用位置、改编范围和保留/损失内容。仅作意图线索的来源可留在构造侧，但需在审核时解释不进入任务的业务原因。不得因正文截断或文件较长自动改为合成。'
+    policy += '\n优先评估reuse，再考虑adapt，最后合成缺少的输入，不强制复用无关文件。全文始终保存在本地，content只是预览。可用search_source_text按关键词定位完整提取正文中的字符范围，再用read_source_text读取上下文。允许只核验任务所需章节后复用完整文件，同时准确记录查阅范围。'
     save(root/'prompt.json', {'system':policy})
     def tool(name, desc, props, required):
         return {'type':'function','function':{'name':name,'description':desc,'parameters':{'type':'object','properties':props,'required':required,'additionalProperties':False}}}
@@ -76,6 +77,7 @@ def run_plan(inputs, destination, config, max_tokens):
              tool('update_plan','Replace selected top-level plan fields',{'changes':{'type':'object','properties':PLAN['properties'],'additionalProperties':False}},['changes'])]
     tools += [tool(n,d,{},[]) for n,d in [('check_plan','Check current plan schema and references'),('review_plan','Request independent semantic review of current plan'),('submit_plan','Submit current approved plan')]]
     tools.append(tool('read_source_text','Read a range of full extracted source text',{'source_id':{'type':'string'},'start':{'type':'integer'},'length':{'type':'integer'}},['source_id','start','length']))
+    tools.append(tool('search_source_text','Search full extracted text, including beyond preview; returns offsets',{'source_id':{'type':'string'},'query':{'type':'string'},'start':{'type':'integer'},'limit':{'type':'integer'}},['source_id','query','start','limit']))
     messages=[{'role':'system','content':policy},{'role':'user','content':json.dumps({**base,'source_artifact_catalog':public_catalog},ensure_ascii=False)}]
     plan=None; version=0; reviewed=None; total_calls=0; started=time.monotonic(); usages=[]; accepted=False
     pending=[]; review_count=0
@@ -114,6 +116,8 @@ def run_plan(inputs, destination, config, max_tokens):
                         version+=1; reviewed=None
                         save(root/f'plan_v{version:02d}.json',plan)
                         result={'version':version,'saved':True}
+                    elif name=='search_source_text':
+                        result=search_source(catalog,**args)
                     elif name=='read_source_text':
                         result=read_source(catalog,**args)
                     elif name=='check_plan': result={'version':version,'errors':check()}

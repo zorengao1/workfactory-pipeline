@@ -174,3 +174,5 @@ config/gpt-mixed-three-timed-policy.json 是三并发示例配置。先完成来
 reference_files 的 reuse 和 adapt 项须填写 source_ids，绑定 source_materials 中带 snapshot 的真实文件。reuse 必须保持单份原文件及其格式，04 前由控制器直接复制，04 完成后校验 SHA256 不变。adapt 由构建者读取原件并按计划改编，记录位置及内容损失。缺失或哈希不符的原文件会报错，不自动转成合成文件。
 
 无需强制所有任务复用真实文件，也不要求模型一次读完整个文件。本次测试覆盖截断范围以后的正文读取、原文件复制、篡改拒绝、来源绑定及路径检查。真实模型自主选择 reuse 的端到端比例尚待批量验证。
+
+来源准备完整保存提取正文并记录哈希。首次输入仅提供12000字符预览，用content_is_preview明确标记；extraction_truncated表示全文是否丢失，不再用于标记预览。03可通过search_source_text检索全文中的关键词位置，再用read_source_text读取相关范围，包含预览之后的内容。优先评估业务适用的reuse，其次adapt，最后合成缺少的材料；允许核验相关章节后复用完整文件，不要求一次读取全文。历史来源快照不自动重写，已存在的artifact.txt仍可按完整正文访问。
