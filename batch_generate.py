@@ -181,6 +181,10 @@ def attempt(case, folder, config):
             'constraints':case['constraints'],'environment':env,'probe_report':probe['result'],
             'workspace':{'root':'/task','writable_paths':['REQUEST.txt','inputs']}},repaired,next_step/'07_repair',config,('inputs','REQUEST.txt'))
         root=repaired
+    from harbor_export import ensure_task
+    harbor_task=folder/'harbor'/case['task_id']
+    ensure_task(case['task_id'],root,harbor_task)
+    update(folder,harbor_task=str(harbor_task),harbor_verifier='pending')
     teacher_root=folder/'teacher_workspace'
     if not teacher_root.exists():shutil.copytree(root,teacher_root)
     teacher=agent('09_teacher',solver_inputs(case,environment(root,plan)),teacher_root,folder/'09_teacher',config,('outputs',))
@@ -193,6 +197,7 @@ def attempt(case, folder, config):
     subprocess.run([sys.executable,str(ROOT/'export_trace.py'),teacher_log,'--output',str(folder/'trajectory.json')],check=True)
     update(folder,state='candidate_complete',clean_environment=str(root),teacher_directory=str(teacher_root),
         trajectory=str(folder/'trajectory.json'),deliverables=teacher['result']['deliverables'],
+        harbor_task=str(harbor_task),harbor_verifier='pending',
         manual_acceptance='pending',training_ready=False)
     return str(folder/'trajectory.json')
 
@@ -219,7 +224,9 @@ def run_case(case, model_dir, config, max_attempts=3):
         update(dest,state='running',model=config['OPENAI_MODEL'],attempt=n,pid=os.getpid())
         try:
             trajectory=attempt(case,folder,config)
-            update(dest,state='candidate_complete',trajectory=trajectory,manual_acceptance='pending',training_ready=False)
+            update(dest,state='candidate_complete',trajectory=trajectory,
+                   harbor_task=str(folder/'harbor'/case['task_id']),harbor_verifier='pending',
+                   manual_acceptance='pending',training_ready=False)
             return
         except StageRejected as exc:
             update(folder,state='rejected',reason=str(exc));update(dest,state='retry_pending',reason=str(exc))

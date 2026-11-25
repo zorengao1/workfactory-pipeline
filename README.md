@@ -195,3 +195,34 @@ reference_files 的 reuse 和 adapt 项须填写 source_ids，绑定 source_mate
 PDF 逐页提取文字，低于 30 个字母或数字的页面调用本地 Tesseract OCR，支持英文和简体中文。诊断记录每页处理方式与字符数。OCR 超时或缺少依赖会明确失败，全篇仍无可读正文则拒绝。原 PDF 保持不变，OCR 正文仅供来源分析。
 
 OCR 依赖已写入 docker/Dockerfile，更新代码后需重新构建所配置的运行镜像。单页渲染最长边 2400 像素，渲染限时 60 秒，OCR 限时 90 秒，单文档提取限时 1800 秒。复杂表格、手写文字和低清图片仍需质量检查，OCR 成功不代表内容准确。
+
+### Harbor 环境与任务导出
+
+新批次在探针通过及环境修复完成后、教师执行前，自动输出到 `attempt-XX/harbor/<task_id>/`。采用 Harbor schema 1.4 的任务配置。当前范围仅环境和任务，评分暂不接入，因此不生成 `tests/test.sh` 或 reward，`verifier_status` 为 `pending`，不能作为已完成评分适配的 benchmark 运行。
+
+```text
+<task_id>/
+├── task.toml
+├── instruction.md
+├── environment/
+│   ├── Dockerfile
+│   └── workspace/
+│       ├── REQUEST.txt
+│       └── inputs/
+└── export_manifest.json
+```
+
+`instruction.md` 来自最终工作环境中的任务说明。`inputs` 保留原始字节及多种文件格式。构建上下文只包含干净任务材料，不打包教师答案、信息图、提示词、API 密钥、生成日志或评分材料。模型在 `/task` 工作，输入文件只读，成果写入 `/task/outputs`，任务环境关闭联网。Dockerfile 包含仓库中的完整运行环境安装步骤，开发机无需预先拥有本机的 workfactory/runtime 镜像。
+
+旧任务可手动导出，环境路径应指向 `status.json` 中的 `clean_environment`，有修复时选最终修复版本。导出不重新调用模型，不改旧运行记录。
+
+```bash
+python3 harbor_export.py \
+  --task-id example-task \
+  --environment /absolute/path/to/clean_environment \
+  --output /absolute/path/to/harbor/example-task
+```
+
+已完成的历史批次不会自动重新运行。导出目录不能覆盖，恢复运行会校验源文件与导出文件哈希。教师轨迹和成果仍保留在任务包外的原运行目录。未来接入评分时，可通过 `--verifier /path/to/tests` 放入明确提供的验证器，单纯复制验证器仍不等于已完成 Harbor 运行验收。
+
+格式依据 https://github.com/harbor-framework/harbor/blob/main/docs-mintlify/tasks/configuration.mdx 。本轮自动测试覆盖结构、文件完整性、答案隔离和恢复校验，未执行 Harbor 容器端到端运行。
