@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
-from workfactory.sources.source_pools import SOCParser,balanced,related_skill_bundles,fetch,fetch_soc
+from workfactory.sources.source_pools import SOCParser,balanced,fetch,fetch_soc
 
 
 class SourcePoolTests(unittest.TestCase):
@@ -43,13 +43,5 @@ class SourcePoolTests(unittest.TestCase):
                 self.assertEqual(len(records),1447)
                 network.assert_not_called()
                 self.assertTrue((Path(tmp)/'soc.json').is_file())
-
-    def test_alias_documents_are_not_proposed_for_composition(self):
-        skills=[{'name':'a','content':'extract quote table prices','eligible_for_composition':True},
-                {'name':'b','content':'compare quote table prices costs','eligible_for_composition':True},
-                {'name':'alias','content':'call another skill','eligible_for_composition':False}]
-        bundles=related_skill_bundles(skills,2,42)
-        self.assertTrue(all(s['name']!='alias' for b in bundles for s in b))
-
 
 if __name__=='__main__':unittest.main()

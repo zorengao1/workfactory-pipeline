@@ -29,6 +29,10 @@ def cases(policy=None):
     return source_cases(policy or load_policy())
 
 
+ROUTES = ('occupation', 'skill', 'deliverable', 'mixed')
+STAGE_ROUTES = {'01a_occupation': 'occupation', '01b_skill': 'skill', '01c_deliverable': 'deliverable'}
+
+
 class StageRejected(Exception):
     pass
 
@@ -208,8 +212,17 @@ def run_case(case, model_dir, config, max_attempts=3):
         raise ValueError('Task configuration changed; use a new output directory to preserve prior attempts')
     if (dest/'status.json').exists() and read_json(dest/'status.json').get('state')=='candidate_complete':return
     save(dest/'seed.json',case)
+    # Four routes. occupation uses its own material; skill recalls related skills around an anchor;
+    # deliverable acquires one real artifact; mixed adds recalled skills and an artifact to an occupation.
+    route = case.get('source_metadata', {}).get('route') or STAGE_ROUTES[case['stage']]
+    if route not in ROUTES:
+        raise ValueError('Unknown source route ' + str(route) + ' for ' + case['task_id'])
     discovery = config.get('_POLICY', {}).get('skill_discovery', {})
-    if discovery.get('enabled') and not case.get('source_metadata', {}).get('skill_discovery'):
+    meta = case.get('source_metadata', {})
+    recall = route == 'mixed' or (route == 'skill' and meta.get('anchor_skill_id'))
+    if recall and not discovery.get('enabled'):
+        raise ValueError(route + ' route requires skill_discovery and the local skill index; no substitute source is used')
+    if recall and not meta.get('skill_discovery'):
         from workfactory.sources.skills_discovery import enrich_skills, DiscoveryRejected
         from workfactory.sources.source_artifacts import full_text_inputs
         update(dest, state='discovering_skills', model=config['OPENAI_MODEL'], pid=os.getpid())
@@ -221,10 +234,14 @@ def run_case(case, model_dir, config, max_attempts=3):
         except Exception as exc:
             update(dest, state='error', reason=str(exc).replace(config['OPENAI_API_KEY'], '[REDACTED]'))
             raise
-    if config.get('_POLICY',{}).get('external_retrieval'):
-        from workfactory.sources.source_retrieval import enrich_case
+    fetch = None
+    if route == 'mixed' and config.get('_POLICY',{}).get('external_retrieval'):
+        from workfactory.sources.source_retrieval import enrich_case as fetch
+    elif route == 'deliverable' and (meta.get('deliverable_search') or meta.get('deliverable_url')):
+        from workfactory.sources.source_retrieval import deliverable_case as fetch
+    if fetch:
         update(dest,state='retrieving_sources',model=config['OPENAI_MODEL'],pid=os.getpid())
-        try:case=enrich_case(case,dest/'source_retrieval',config)
+        try:case=fetch(case,dest/'source_retrieval',config)
         except Exception as exc:
             update(dest,state='error',reason=str(exc).replace(config['OPENAI_API_KEY'],'[REDACTED]'))
             raise

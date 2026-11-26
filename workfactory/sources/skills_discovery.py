@@ -1,37 +1,33 @@
-"""Bounded online CLI discovery. Skills are untrusted source data, never executed."""
+"""Skill recall and composition from the local embedding index. Skills are untrusted source data, never executed.
+
+Mixed route: occupation query vectors nominate skills. Skill route: an anchor skill nominates related skills.
+In both, the model reads full bodies, judges applicability and composes a dependent workflow.
+A missing index fails; no other source is substituted.
+"""
 import copy
 import fcntl
 import hashlib
 import json
-import os
-import re
-import subprocess
-import time
-import urllib.error
-import urllib.request
-from html.parser import HTMLParser
 from pathlib import Path
 
 from workfactory.pipeline.contracts import ROOT, TEXT, array, obj, string, validate
 from workfactory.clients.pilot import complete
 
-DEFAULTS = dict(enabled=True, cli='skills', cli_version='1.8.1',
-                initial_queries=3, per_query=5, initial_candidates=15,
-                extra_candidates=10, max_research_rounds=2, max_candidates=35,
-                min_selected=2, max_selected=4, min_operations=6, min_chain_depth=4,
-                cache_dir='data/skills_discovery_cache', cache_ttl_seconds=86400,
-                request_timeout=60)
+DEFAULTS = dict(enabled=True, backend='local_index', index_dir='data/skill_index',
+                per_query=5, initial_candidates=15, extra_candidates=10, max_research_rounds=1,
+                min_similarity=0.4, max_skill_words=4000, neighbor_min_similarity=0.5,
+                neighbor_max_similarity=0.85, min_selected=2, max_selected=4,
+                skill_route_min_selected=1, min_operations=6, min_chain_depth=4)
 CAP = obj(id=TEXT, operation=TEXT, input=TEXT, output=TEXT)
-PLAN = obj(objective=TEXT, capabilities=array(CAP, 3), queries=array(TEXT, 3, 3))
 SELECTED = obj(source_id=TEXT, capability_ids=array(TEXT, 1), evidence_quote=TEXT,
                role=TEXT, inputs=array(TEXT, 1), outputs=array(TEXT, 1))
 STEP = obj(id=TEXT, source_id=TEXT, operation=TEXT, input=TEXT, output=TEXT,
            depends_on=array(TEXT))
 RESOURCE = obj(name=TEXT, provision=string('provided', 'synthesize', 'unavailable'), reason=TEXT)
-REVIEW = obj(decision=string('ready', 'search', 'reject'),
-             selected=array(SELECTED), steps=array(STEP), resources=array(RESOURCE, 1),
-             missing_capabilities=array(TEXT), next_queries=array(TEXT, maximum=3),
-             rejections=array(obj(source_id=TEXT, reason=TEXT)), explanation=TEXT)
+JUDGE = obj(decision=string('ready', 'more', 'reject'), objective=TEXT, capabilities=array(CAP),
+            selected=array(SELECTED), steps=array(STEP), resources=array(RESOURCE),
+            missing_capabilities=array(TEXT), rejections=array(obj(source_id=TEXT, reason=TEXT)),
+            explanation=TEXT)
 
 
 def save(path, data):
@@ -48,142 +44,26 @@ def digest(text):
 
 def settings(config):
     policy = {**DEFAULTS, **config.get('_POLICY', {}).get('skill_discovery', {})}
-    for key in ('per_query', 'initial_candidates', 'extra_candidates', 'max_candidates',
-                'min_selected', 'max_selected', 'min_operations', 'min_chain_depth',
-                'cache_ttl_seconds', 'request_timeout'):
+    if policy['backend'] != 'local_index':
+        raise ValueError('Skill discovery only supports the local_index backend, got ' + str(policy['backend']))
+    for key in ('per_query', 'initial_candidates', 'extra_candidates', 'min_selected', 'max_selected',
+                'skill_route_min_selected', 'min_operations', 'min_chain_depth'):
         if type(policy[key]) is not int or policy[key] < 1:
             raise ValueError('Invalid skill discovery setting ' + key)
-    if policy['initial_queries'] != 3 or type(policy['max_research_rounds']) is not int or policy['max_research_rounds'] < 0:
-        raise ValueError('Expected three initial queries and nonnegative retry rounds')
-    if policy['min_selected'] > policy['max_selected']:
+    if type(policy['max_research_rounds']) is not int or policy['max_research_rounds'] < 0:
+        raise ValueError('Expected nonnegative retry rounds')
+    for key in ('min_similarity', 'neighbor_min_similarity', 'neighbor_max_similarity'):
+        if not isinstance(policy[key], (int, float)) or isinstance(policy[key], bool) or not 0 <= policy[key] <= 1:
+            raise ValueError('Invalid skill discovery setting ' + key)
+    if type(policy['max_skill_words']) is not int or policy['max_skill_words'] < 50:
+        raise ValueError('Invalid skill discovery setting max_skill_words')
+    if policy['min_selected'] > policy['max_selected'] or policy['skill_route_min_selected'] > policy['max_selected']:
         raise ValueError('Invalid selected skill range')
     return policy
 
 
 class DiscoveryRejected(ValueError):
     pass
-
-
-class PageText(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self.parts = []
-
-    def handle_starttag(self, tag, attrs):
-        if tag in {'p', 'li', 'h1', 'h2', 'h3', 'pre', 'tr', 'br', 'hr'}:
-            self.parts.append('\n')
-
-    def handle_data(self, data):
-        self.parts.append(data)
-
-
-def full_skill_text(html):
-    """Assemble one complete skill body from the two Next.js page fields."""
-    chunks = []
-    for match in re.finditer(r'self\.__next_f\.push\((.*?)\)</script>', html, re.S):
-        try:
-            item = json.loads(match[1])
-        except ValueError:
-            continue
-        if isinstance(item, list) and len(item) > 1 and item[0] == 1 and isinstance(item[1], str):
-            chunks.append(item[1])
-    flight = ''.join(chunks)
-    def field(name):
-        found = re.search('"' + name + r'"\s*:\s*("(?:\\.|[^"\\])*")', flight)
-        if not found:
-            raise ValueError('Full skill page field missing ' + name)
-        value = json.loads(found[1])
-        if value.startswith('$'):
-            ref = re.search(re.escape(value[1:]) + r':T([0-9a-f]+),', flight)
-            if not ref:
-                raise ValueError('Unresolved skill page body reference')
-            length = int(ref[1], 16)
-            raw = flight[ref.end():].encode()[:length]
-            if len(raw) != length:
-                raise ValueError('Truncated skill page data')
-            return raw.decode()
-        return value
-    parser = PageText()
-    parser.feed(field('previewHtml') + field('restHtml'))
-    text = ''.join(parser.parts).strip()
-    if not text:
-        raise ValueError('Skill body is empty')
-    return text
-
-
-def search_cli(query, folder, policy):
-    """Use installed official CLI, observing HTTP failures that CLI otherwise hides."""
-    folder.mkdir(parents=True, exist_ok=True)
-    observer = ROOT / 'scripts/skills_http_observer.cjs'
-    env = {**os.environ, 'DISABLE_TELEMETRY': '1', 'NO_COLOR': '1'}
-    env['NODE_OPTIONS'] = env.get('NODE_OPTIONS', '') + ' --require ' + json.dumps(str(observer))
-    for attempt in range(3):
-        proc = subprocess.run([policy['cli'], 'find', query], stdin=subprocess.DEVNULL,
-                              capture_output=True, text=True, timeout=policy['request_timeout'], env=env)
-        events = [json.loads(line[len('WF_SEARCH '):]) for line in proc.stderr.splitlines()
-                  if line.startswith('WF_SEARCH ')]
-        save(folder / f'attempt-{attempt}.json', dict(query=query, stdout=proc.stdout,
-             stderr=proc.stderr, exit_code=proc.returncode, http=events))
-        failed = [e for e in events if e.get('status') != 200]
-        if any(e.get('valid_payload') is False for e in events):
-            raise ValueError('Skills search response schema changed')
-        if not proc.returncode and events and not failed:
-            # Consume structured IDs actually returned to CLI, in CLI output order.
-            known = {s['id']: s for e in events for s in e.get('skills', [])}
-            urls = re.findall(r'https://skills\.sh/([^\s\x1b]+)', proc.stdout)
-            result = []
-            seen = set()
-            for key in urls:
-                if key in known and key not in seen:
-                    seen.add(key)
-                    result.append({**known[key], 'url': 'https://www.skills.sh/' + key})
-            if known and not result:
-                raise ValueError('CLI output format changed')
-            return result
-        transient = failed and all(e.get('status') is None or e.get('status') in (429, 500, 502, 503, 504) for e in failed)
-        if not transient or attempt == 2:
-            raise RuntimeError('Skills CLI search failed; see HTTP audit, not a zero-match result')
-        time.sleep(min(30, max([2 ** attempt] + [e.get('retry_after', 0) for e in failed])))
-    raise RuntimeError('Skills CLI retry exhausted')
-
-
-def read_skill(record, cache, policy):
-    key = digest(record['id'])
-    folder = cache / key
-    folder.mkdir(parents=True, exist_ok=True)
-    with (folder / 'cache.lock').open('a+') as guard:
-        fcntl.flock(guard, fcntl.LOCK_EX)
-        meta_path = folder / 'current.json'
-        if meta_path.exists():
-            meta = json.loads(meta_path.read_text())
-            text = (folder / meta['text_file']).read_text()
-            if digest(text) != meta['sha256']:
-                raise ValueError('Skill cache checksum changed')
-            if time.time() - meta['fetched_at'] < policy['cache_ttl_seconds']:
-                return {**record, **meta, 'content': text}
-        for attempt in range(3):
-            try:
-                with urllib.request.urlopen(record['url'], timeout=policy['request_timeout']) as response:
-                    raw = response.read(8 * 1024 * 1024 + 1)
-                break
-            except (urllib.error.URLError, TimeoutError) as exc:
-                if isinstance(exc, urllib.error.HTTPError) and exc.code not in (429, 500, 502, 503, 504):
-                    raise
-                if attempt == 2:
-                    raise
-                time.sleep(2 ** attempt)
-        if len(raw) > 8 * 1024 * 1024:
-            raise ValueError('Skill page exceeds 8 MiB')
-        version = hashlib.sha256(raw).hexdigest()
-        (folder / (version + '.html')).write_bytes(raw)
-        text = full_skill_text(raw.decode())
-        sha = digest(text)
-        (folder / (sha + '.txt')).write_text(text)
-        meta = dict(sha256=sha, text_file=sha + '.txt', fetched_at=time.time(),
-                    snapshot=str((folder / (version + '.html')).resolve()),
-                    source_id='skill-' + key[:24])
-        save(meta_path, meta)
-        return {**record, **meta, 'content': text}
 
 
 def ask(kind, payload, schema, folder, config):
@@ -262,94 +142,99 @@ def enrich_skills(case, folder, config):
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
     policy = settings(config)
-    checkpoint = dict(case=case, policy=policy, model=config['OPENAI_MODEL'])
+    from workfactory.sources.skill_index import load_index
+    location = Path(policy['index_dir'])
+    index = load_index(location if location.is_absolute() else ROOT / location)
+    checkpoint = dict(case=case, policy=policy, model=config['OPENAI_MODEL'], index=index.identity)
     with (folder / 'run.lock').open('a+') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
-        return _enrich(case, folder, config, policy, checkpoint)
+        start = folder / 'input.json'
+        if start.exists() and json.loads(start.read_text()) != checkpoint:
+            raise ValueError('Skill discovery configuration changed; use a new run directory')
+        save(start, checkpoint)
+        if (folder / 'enriched.json').exists():
+            return json.loads((folder / 'enriched.json').read_text())
+        return _enrich(case, folder, config, policy, index)
 
 
-def _enrich(case, folder, config, policy, checkpoint):
-    start = folder / 'input.json'
-    if start.exists() and json.loads(start.read_text()) != checkpoint:
-        raise ValueError('Skill discovery configuration changed; use a new run directory')
-    save(start, checkpoint)
-    if (folder / 'enriched.json').exists():
-        return json.loads((folder / 'enriched.json').read_text())
-    version = subprocess.run([policy['cli'], '--version'], capture_output=True, text=True, check=True).stdout.strip()
-    if version != policy['cli_version']:
-        raise ValueError('Expected skills CLI ' + policy['cli_version'] + ', got ' + version)
-    plan = ask('plan', {'case': case, 'policy': policy}, PLAN, folder, config)
-    if len({c['id'] for c in plan['capabilities']}) != len(plan['capabilities']):
-        raise ValueError('Duplicate capability IDs')
-    queries = plan['queries']
-    if len({q.strip().casefold() for q in queries}) != 3:
-        raise ValueError('Three distinct initial search queries required')
+def accept(case, folder, plan, review, documents, method, rounds, extra=None):
+    result = copy.deepcopy(case)
+    selected = {s['source_id'] for s in review['selected']}
+    present = {m['source_id'] for m in result['source_materials']}
+    result['source_materials'] += [dict(source_id=d['source_id'], provenance=d.get('provenance') or d['url'],
+        url=d['url'], sha256=d['sha256'], content=d['content']) for d in documents if d['source_id'] in selected and d['source_id'] not in present]
+    result.setdefault('constraints', {})['skill_workflow'] = dict(objective=plan['objective'],
+        capabilities=plan['capabilities'], selected=review['selected'], steps=review['steps'], resources=review['resources'])
+    result['constraints']['scope'] = result['constraints'].get('scope', '') + '\nPreserve the approved skill workflow, capability coverage and substantive dependent operations. Supply required premises; do not precompute solver outputs.'
+    result.setdefault('source_metadata', {})['skill_discovery'] = dict(method=method,
+        selected_ids=sorted(selected), rounds=rounds, candidates=len(documents),
+        audit=str(folder.resolve()), execution_verified=False, **(extra or {}))
+    save(folder / 'enriched.json', result)
+    return result
+
+
+def _enrich(case, folder, config, policy, index):
+    """Embedding recall nominates; the model judges full bodies and composes the workflow."""
+    meta = case.get('source_metadata', {})
+    route = meta.get('route')
+    if route == 'mixed':
+        code = meta.get('onet_code')
+        if not code:
+            raise ValueError('Mixed route recall needs source_metadata.onet_code')
+        kind, anchor, documents = 'judge', None, []
+        recall = lambda limit, seen: index.candidates(code, limit, policy['per_query'], policy['min_similarity'],
+                                                     50, policy['max_skill_words'], exclude=seen)
+        method = 'local embedding index by occupation + full-body LLM judge'
+    elif route == 'skill':
+        anchor = meta.get('anchor_skill_id')
+        documents = [m for m in case['source_materials'] if m['source_id'] == 'skill-' + str(anchor)]
+        if not anchor or len(documents) != 1:
+            raise ValueError('Skill route recall needs the anchor skill among source materials')
+        documents = [dict(documents[0], id=anchor)]
+        kind = 'compose'
+        policy = {**policy, 'min_selected': policy['skill_route_min_selected']}
+        recall = lambda limit, seen: index.neighbors(anchor, limit, policy['neighbor_min_similarity'],
+                                                    policy['neighbor_max_similarity'], 50, policy['max_skill_words'], exclude=seen)
+        method = 'local embedding index by anchor skill + full-body LLM composition'
+    else:
+        raise ValueError('Skill discovery applies to mixed and skill routes, got ' + str(route))
+    synthesis = case.get('constraints', {}).get('synthesis_allowed', False)
     previous_feedback = []
-    attempted = set()
-    documents = []
-    seen_hashes = set()
-    tried_queries = set()
-    cache = Path(policy['cache_dir'])
-    if not cache.is_absolute():
-        cache = ROOT / cache
-    for round_no in range(policy['max_research_rounds'] + 1):
+    review = None
+    errors = ['No candidate skills above the similarity floor']
+    last = policy['max_research_rounds']
+    for round_no in range(last + 1):
         round_dir = folder / f'round-{round_no:02d}'
         round_dir.mkdir(exist_ok=True)
-        budget = policy['initial_candidates'] if round_no == 0 else policy['extra_candidates']
-        shortlists = []
-        for i, query in enumerate(queries):
-            if query.strip().casefold() in tried_queries:
-                continue
-            tried_queries.add(query.strip().casefold())
-            result_path = round_dir / f'query-{i}.json'
-            if result_path.exists():
-                result = json.loads(result_path.read_text())
-            else:
-                result = search_cli(query, round_dir / f'query-{i}', policy)
-                save(result_path, result)
-            shortlists.append(result[:policy['per_query']])
-        # Round-robin preserves different search facets under the per-round budget.
-        picked = [lst[i] for i in range(policy['per_query']) for lst in shortlists if i < len(lst)]
-        added = 0
-        for record in picked:
-            if record['id'] in attempted:
-                continue
-            if added >= budget or len(attempted) >= policy['max_candidates']:
-                break
-            attempted.add(record['id'])
-            added += 1
-            evidence = round_dir / (digest(record['id']) + '.json')
-            try:
-                doc = json.loads(evidence.read_text()) if evidence.exists() else read_skill(record, cache, policy)
-                if not evidence.exists():
-                    save(evidence, doc)
-                if doc['sha256'] not in seen_hashes:
-                    documents.append(doc)
-                    seen_hashes.add(doc['sha256'])
-            except (ValueError, urllib.error.URLError, TimeoutError) as exc:
-                save(round_dir / (digest(record['id']) + '-error.json'), {'id': record['id'], 'error': str(exc)})
-        payload = {'case': case, 'plan': plan, 'policy': policy, 'candidates': documents,
-                   'round': round_no, 'tried_queries': sorted(tried_queries), 'previous_feedback': previous_feedback}
-        review = ask('review-' + str(round_no), payload, REVIEW, folder, config)
-        errors = review_errors(plan, review, documents, policy, case.get('constraints', {}).get('synthesis_allowed', False))
-        save(round_dir / 'coverage.json', dict(review=review, errors=errors, candidate_count=len(documents), examined=len(attempted)))
+        stored = round_dir / 'candidates.json'
+        if stored.exists():
+            fresh = json.loads(stored.read_text())
+        else:
+            fresh = recall(policy['initial_candidates'] if round_no == 0 else policy['extra_candidates'],
+                           [d['id'] for d in documents])
+            save(stored, fresh)
+        if not fresh and round_no:
+            break
+        documents = documents + fresh
+        if not documents:
+            break
+        payload = {'case': case, 'policy': policy, 'candidates': documents, 'round': round_no,
+                   'final_round': round_no == last, 'previous_feedback': previous_feedback}
+        if anchor:
+            payload['anchor_source_id'] = 'skill-' + anchor
+        review = ask(kind + '-' + str(round_no), payload, JUDGE, folder, config)
+        plan = dict(objective=review['objective'], capabilities=review['capabilities'])
+        errors = review_errors(plan, review, documents, policy, synthesis)
+        if len(plan['capabilities']) < 3 or len({c['id'] for c in plan['capabilities']}) != len(plan['capabilities']):
+            errors.append('At least three distinct capabilities required')
+        if anchor and 'skill-' + anchor not in {s['source_id'] for s in review['selected']}:
+            errors.append('Anchor skill must be part of the workflow')
+        save(round_dir / 'coverage.json', dict(review=review, errors=errors, candidate_count=len(documents)))
         if review['decision'] == 'ready' and not errors:
-            result = copy.deepcopy(case)
-            selected = {s['source_id'] for s in review['selected']}
-            result['source_materials'] += [dict(source_id=d['source_id'], provenance=d['url'],
-                url=d['url'], sha256=d['sha256'], content=d['content']) for d in documents if d['source_id'] in selected]
-            result.setdefault('constraints', {})['skill_workflow'] = dict(objective=plan['objective'],
-                capabilities=plan['capabilities'], selected=review['selected'], steps=review['steps'], resources=review['resources'])
-            result['constraints']['scope'] = result['constraints'].get('scope', '') + '\nPreserve the approved skill workflow, capability coverage and substantive dependent operations. Supply required premises; do not precompute solver outputs.'
-            result.setdefault('source_metadata', {})['skill_discovery'] = dict(method='skills CLI + full-body LLM review',
-                selected_ids=sorted(selected), rounds=round_no + 1, candidates=len(documents),
-                audit=str(folder.resolve()), execution_verified=False)
-            save(folder / 'enriched.json', result)
-            return result
-        if review['decision'] == 'reject' or not review['next_queries']:
+            return accept(case, folder, plan, review, documents, method, round_no + 1, dict(index=index.identity))
+        if review['decision'] == 'reject':
             break
         previous_feedback = errors + review['missing_capabilities']
-        queries = review['next_queries']
-    save(folder / 'rejected.json', {'reason': 'No sufficient executable skill workflow within search budget',
+    save(folder / 'rejected.json', {'reason': 'No sufficient executable skill workflow among indexed candidates',
                                   'last_review': review, 'structural_errors': errors})
     raise DiscoveryRejected('Skill discovery rejected; inspect ' + str(folder / 'rejected.json'))

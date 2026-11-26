@@ -41,18 +41,8 @@ O*NET 与技能网页快照及派生输入位于本地 data/，由脚本重复�
 职业上下文搜索与真实交付物已接入 GPT 原生 web_search 混合输入试跑。按职业在线发现技能、跨任务来源共享缓存及覆盖采样仍待完成。
 当前没有复现论文全部来源池或职业频率分布，完整状态见 docs/IMPLEMENTATION_STATUS.md。
 
-技能 CLI 采集入口
+技能来源
 
-默认 skills_backend 为 cli，版本固定 1.8.1。skills_repositories 指定 GitHub 仓库列表，每个仓库采集全部技能。网页后端的数量限制仅适用于显式选择的 html 后端。
-
-python3 source_pools.py fetch-skills
-python3 source_pools.py fetch-skills --repository anthropics/skills --output tmp/skills-preview.json
-python3 source_pools.py fetch-skills --refresh
-
-CLI 下载在临时 HOME 与工作区运行，使用 copy 模式，关闭遥测。原始 SKILL.md 和配套文件保存在 data/source_pools/skills-cli，每次更新建立新快照，CLI 锁文件和所有文件哈希一并保留。再次采集默认验证本地缓存，无需联网。失败时不会切换其他服务，也不会覆盖原来的 skills.json。
-
-默认输出仍为 data/source_pools/skills.json，因此 build 和后续管线直接复用。显式 output 便于单独测试，不替换当前技能池。来源文件只作为模型输入数据，不在构造或教师环境中安装、执行这些技能。
-
-2026年11月17日全量 CLI 采集已完成
-配置中的8个仓库共640份文档，639份通过正文长度门槛。该范围只代表配置仓库，不代表 skills.sh 全站。
-原生 GPT 联网检索和真实交付物候选校验已接入混合输入试跑。冻结来源在构建阶段只读挂载到 /sources，求解阶段不挂载该目录。
+2026年11月26日起技能来自本地向量索引，CLI 采集入口和在线搜索已移除。
+四路输入、索引内容和导出方法见 docs/guide/RUNNING.md 的四路输入一节。
+此前 CLI 采集的 640 份文档不再作为输入来源。

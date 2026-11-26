@@ -32,20 +32,20 @@
   },
   "skill_discovery": {
     "enabled": true,
-    "cli": "skills",
-    "cli_version": "1.8.1",
-    "initial_queries": 3,
+    "backend": "local_index",
+    "index_dir": "data/skill_index",
     "per_query": 5,
     "initial_candidates": 15,
     "extra_candidates": 10,
-    "max_research_rounds": 2,
-    "max_candidates": 35,
+    "max_research_rounds": 1,
+    "min_similarity": 0.4,
+    "max_skill_words": 4000,
     "min_selected": 2,
     "max_selected": 4,
     "min_operations": 6,
     "min_chain_depth": 4,
-    "cache_dir": "data/skills_discovery_cache",
-    "cache_ttl_seconds": 86400,
-    "request_timeout": 60
+    "neighbor_min_similarity": 0.5,
+    "neighbor_max_similarity": 0.85,
+    "skill_route_min_selected": 1
   }
 }

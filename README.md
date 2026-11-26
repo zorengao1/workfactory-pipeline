@@ -16,7 +16,7 @@
 
 ~~~mermaid
 flowchart LR
-    A["SOC · O*NET<br/>skills.sh · 真实交付物"] --> B["01–02<br/>意图合成与审查"]
+    A["SOC · O*NET<br/>本地技能索引 · 真实交付物"] --> B["01–02<br/>意图合成与审查"]
     B --> C["03<br/>信息图规划与审核"]
     C --> D["04–05<br/>文件构建与检查"]
     D --> E["06<br/>独立探针"]
@@ -55,17 +55,16 @@ flowchart LR
 
 ## 快速启动
 
-在仓库根目录执行。需要 Python 3.9+、Node.js、Docker Engine，以及可用的模型接口。
+在仓库根目录执行。需要 Python 3.9+、numpy、Docker Engine，以及可用的模型接口。
 
 ~~~bash
 git clone https://github.com/zorengao1/workfactory-pipeline.git
 cd workfactory-pipeline
 
 # 准备来源与运行环境
-npm install -g skills@1.8.1
 python3 -m workfactory sources fetch-soc
 python3 -m workfactory sources fetch-onet
-python3 -m workfactory sources fetch-skills
+# 把本地技能索引放到 data/skill_index，见运行手册的四路输入一节
 python3 -m workfactory sources build
 docker build -t workfactory/runtime:v2 docker
 
@@ -82,7 +81,7 @@ python3 -m workfactory batch \
   --model deepseek-v4.1-flash-1017
 ~~~
 
-凭据格式见 [credentials.env.example](config/credentials.env.example)。运行前按实际接口修改策略中的阶段模型、凭据路径、检索和并发参数。默认在线检索需要支持 Responses web_search 的接口，工具执行阶段需要工具调用能力。
+凭据格式见 [credentials.env.example](config/credentials.env.example)。运行前按实际接口修改策略中的阶段模型、凭据路径、检索和并发参数。mixed 和 deliverable 两路的真实交付物检索需要支持 Responses web_search 的接口，工具执行阶段需要工具调用能力。
 
 更多命令可通过 <code>python3 -m workfactory --help</code> 查看。
 

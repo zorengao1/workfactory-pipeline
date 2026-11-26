@@ -26,13 +26,14 @@
 
 ## 原素材入口
 
-默认输入已改为 SOC、O*NET 和 skills.sh 来源生成的清单。config/cases.json 等手写情境仅保留为测试样例，不作为默认来源。
+默认输入由 SOC、O*NET、本地技能索引和真实交付物生成。config/cases.json 等手写情境仅保留为测试样例，不作为默认来源。
 
 | 来源 | 用途 | 固定信息 |
 |---|---|---|
 | BLS 2018 SOC | 大类、细分职业、职责和层级 | 论文引用的 major_groups.htm |
 | O*NET | 细分角色、实际任务、技能与工作活动 | 31.0 版本 |
-| skills.sh | 在线检索、正文筛选与技能组合 | CLI 搜索记录、正文缓存和哈希 |
+| 本地技能索引 | 技能召回、正文判断与技能组合 | 索引标识、向量模型名和正文哈希 |
+| 真实交付物 | 反推工作意图，或作为任务输入复用 | 下载原文件、提取正文、URL 和哈希 |
 
 BLS 官方地址为 https://www.bls.gov/soc/2018/major_groups.htm 。本机普通脚本收到 HTTP 403，返回页面说明自动采集受到限制。正常浏览器能够访问同一地址，因此通过 Chrome 保存了官方 HTML。resources/soc-2018 保存该页面和来源哈希，属于可核验的原素材快照。后续开发机默认读取这份固定快照，不依赖聊天或浏览器会话，也不切换其他来源。
 
@@ -42,48 +43,30 @@ BLS 官方地址为 https://www.bls.gov/soc/2018/major_groups.htm 。本机普�
 python3 -m workfactory.sources.source_pools fetch-soc --import-html /absolute/path/major_groups.html
 ```
 
-技能采集默认使用 skills CLI，在临时 HOME 和临时工作区下载配置中的仓库。原始 SKILL.md、配套文件、CLI 锁文件与内容哈希保存在 data/。文档仅作为合成意图的素材，不执行其中的指令或脚本，不修改用户现有 Agent 的技能配置。已有快照经哈希校验后可离线复用。
+技能来自预先建好的本地索引，不在线采集。技能文档仅作为合成意图的素材，不执行其中的指令或脚本。索引的内容和导出方法见四路输入一节。
 
 ## 开发机准备
 
-需要 Python 3.9 或更新版本、可用 Docker Engine 和模型接口。控制器使用 Python 标准库。技能采集额外需要 Node.js 和 skills CLI 1.8.1。Docker 中安装文档处理库和 LibreOffice，不依赖 Codex 或本机 Office。
+需要 Python 3.9 或更新版本、可用 Docker Engine 和模型接口。控制器使用 Python 标准库，读取技能索引另需 numpy。不需要 Node.js。Docker 中安装文档处理库和 LibreOffice，不依赖 Codex 或本机 Office。
 
 ```bash
 git clone https://github.com/zorengao1/workfactory-pipeline.git
 cd workfactory-pipeline
 python3 -m workfactory.sources.source_pools fetch-soc
 python3 -m workfactory.sources.source_pools fetch-onet
-npm install -g skills@1.8.1
-python3 -m workfactory.sources.source_pools fetch-skills
+# 把技能索引放到 data/skill_index 后再生成候选输入
 python3 -m workfactory.sources.source_pools build
 docker build -t workfactory/runtime:v2 docker
 python3 scripts/check_environment.py
 python3 -m unittest discover -s tests -v
 ```
 
-config/source-pools.json 控制 O*NET 版本、技能仓库、采集后端与抽样参数。CLI 默认采集所列仓库的全部技能。新增仓库需加入 skills_repositories。该配置覆盖指定仓库，并非全站遍历。下载文件保存 URL、获取时间和 SHA256，缓存改变会明确报错。职业候选按 SOC 大类轮流排列，技能候选先抽取入口锚点；默认批量管线再通过在线 skills CLI 搜索互补技能，并由模型检查正文、覆盖和实际输入输出关系。该抽样方式没有复刻论文的频率分布。
+config/source-pools.json 控制 O*NET 版本、职业筛选表、技能索引位置、各路数量与抽样种子。data/source_pools/statistics.json 给出各路候选输入数量。候选输入数量不等于已生成环境或已验收轨迹数量。更换来源或配置后应创建新的批次目录。
 
-技能池更新采用显式命令。首次采集需要联网，缓存复用不需要搜索或模型 API。缺少 CLI、下载失败或缓存被改动时明确停止，不自动切换后端。更新来源后应创建新的批次，不覆盖正在运行的任务。
-
-```bash
-# 单个仓库试采集，结果单独保存
-python3 -m workfactory.sources.source_pools fetch-skills --repository anthropics/skills --output tmp/skills-preview.json
-# 使用已验证的本地缓存生成技能池
-python3 -m workfactory.sources.source_pools fetch-skills
-# 显式重新下载配置中的仓库，旧快照保留
-python3 -m workfactory.sources.source_pools fetch-skills --refresh
-# 再生成候选输入，之后以新批次运行
-python3 -m workfactory.sources.source_pools build
-```
-
-旧版网页目录采集入口已移除。fetch-skills 仅使用 CLI 下载入口技能素材；批量生成时另由在线 CLI 搜索互补技能，读取正文后交给模型筛选。
-
-data/source_pools/statistics.json 给出原素材和候选输入规模。当前快照统计见 docs/SOURCE_POOL_STATISTICS.json。候选输入数量不等于已生成环境或已验收轨迹数量。
-
-build 默认每个 O*NET 职业产生一个候选输入，并创建 24 个技能组合候选。小批量验证可以显式减少数量。
+小批量验证可以显式减少数量。
 
 ```bash
-python3 -m workfactory.sources.source_pools build --occupations 23 --skill-cases 4
+python3 -m workfactory.sources.source_pools build --occupations 23 --skill-cases 4 --mixed-cases 4 --deliverable-cases 4
 ```
 
 每个职业不强制包含全部职责，只要求模型从来源支持的工作中选择一个可数字化执行的目标。业务情境和具体企业数据的合成须标注。
@@ -163,7 +146,7 @@ GitHub 保存源码、配置、提示词、测试、说明、Dockerfile 和小�
 
 ## 混合来源并发试跑
 
-scripts/prepare_mixed_inputs.py 从当前技能池为指定职业匹配候选技能。候选的词面相关性由检索提名，模型仍需判断真实适用性。
+scripts/prepare_mixed_inputs.py 为指定职业预览 mixed 路的技能召回与模型判断，结果可作为小批量输入。候选由本地索引提名，模型判断真实适用性。
 
 启用 external_retrieval 时显式配置 retrieval.backend 为 responses_web_search，并在外部凭据文件配置 OPENAI_API_MODE=responses。联网只发生在来源准备阶段，探针和教师只使用冻结后的可见任务材料。原生 web_search 请求强制执行检索并保存来源列表；候选真实交付物经下载和解析验证，失败候选逐个保留，不以搜索摘要代替已下载文件。最多检索三份候选，仍无可读文件则停止该任务。下载检查 Content-Length，截断文件保留后从同一 URL 重新获取。
 
@@ -231,23 +214,93 @@ python3 -m workfactory.exports.harbor_export \
 格式依据 https://github.com/harbor-framework/harbor/blob/main/docs-mintlify/tasks/configuration.mdx 。本轮自动测试覆盖结构、文件完整性、答案隔离和恢复校验，未执行 Harbor 容器端到端运行。
 
 
-## 在线技能搜索与能力覆盖
+## 四路输入与本地技能索引
 
-默认 `config/pipeline.json` 已启用 `skill_discovery`。正常运行 `batch_generate.py` 时，会在意图合成和信息图构建前完成技能发现。旧配置缺少该字段时维持原行为，需要显式加入配置以启用。无需 embedding 模型，也不需要本地技能全集。
+候选输入按来源分成四路，由 `source_metadata.route` 标明。前三路对应论文的三种意图来源，mixed 是本仓库增加的组合路线。
 
-准备环境需要 Node.js 和官方 `skills@1.8.1` CLI。可在开发机执行 `npm install -g skills@1.8.1`，并确保 `skills --version` 输出 `1.8.1`。搜索和技能正文获取在编排进程执行，不在教师沙箱执行。下载的技能指令仅作为任务构造资料，不会安装或激活为编排 Agent 的技能。
+| 路线 | 生成时的输入 | 运行时准备的来源 | 意图阶段 |
+|---|---|---|---|
+| occupation | 一个 O*NET 职业 | 无 | 01a |
+| skill | 索引中的一个锚点技能 | 召回与锚点相关的技能，模型按输入输出能否衔接组合 | 01b |
+| deliverable | 一个检索线索，或一个已知 URL | 取得一份真实交付物，作为唯一意图素材 | 01c |
+| mixed | 一个 O*NET 职业 | 按职业召回技能并由模型判断，再检索一份真实交付物 | 01a |
 
-流程如下。
+缺少 route 的旧输入按阶段推断为前三路之一，不追加任何来源。skill 和 mixed 在技能索引缺失时直接报错，deliverable 取不到可读文件时停止该任务，各路之间不互相替代。
 
-1. 模型根据职业或工作素材固定工作目标，提出三种以上互补能力和三个搜索短语。
-2. 官方 CLI 分别搜索，每个查询取前五条，轮流合并去重，首轮最多检查十五条候选。
-3. 读取技能页面的完整展开正文，按内容哈希去重，保存原页面及正文。按技能 ID 加锁共享缓存，默认一天后更新。历史版本保留。
-4. 模型通常选择二至四个技能，提交正文证据、能力覆盖、必要资源与步骤依赖。程序校验能力 ID 全覆盖、引用证据存在、至少六个不同操作及四层有序依赖。模型另外检查操作是否实质不同、依赖是否真实、资源是否可提供；数量门槛不能代替语义审查。
-5. 能力不足时按缺口改写关键词，最多补搜两轮，每轮最多新增十条，累计最多检查三十五条。到上限仍不充分则拒绝该源任务，继续批次其他任务。网络或接口故障单独报错，不能算零匹配。
-6. 选中正文与工作流进入 01 意图合成，02 检查是否保留能力和复杂度，03 将必要输入及派生工作落实为信息图。探针和独立教师仍负责最终执行验证。
+`sources build` 一次生成四路输入。
 
-`skills_discovery.py` 是实现入口，`prompts/skills_plan.txt` 和 `prompts/skills_review.txt` 定义两次模型调用的职责。模型沿用该源任务阶段的 `stage_models` 与 `stage_credentials`，使用现有 API 并发限流。skills CLI 的网络请求不使用模型 API。`scripts/skills_http_observer.cjs` 只观察 CLI 原有请求，识别被 CLI 隐藏的 HTTP 错误，不更换搜索服务或排序算法。
+```bash
+python3 -m workfactory sources build
+python3 -m workfactory sources build --digitizable yes limited --skill-cases 500 --mixed-cases 200 --deliverable-cases 200
+python3 -m workfactory sources build --deliverable-manifest /absolute/path/deliverables.json
+```
 
-每个任务的 `skill_discovery/` 保留输入、模型请求和响应、每轮关键词、CLI 原始输出和 HTTP 状态、候选完整正文、覆盖检查及接受或拒绝结果。成功检查点可复用，输入、模型或策略变化会要求使用新运行目录。数据和日志均在 Git 忽略目录，密钥仍从本地 env 文件读取。
+数量参数取 -1 表示全部可用职业。当前每个职业或锚点在每一路只生成一条输入，更大批量需要同一来源生成多条不同输入，尚未实现。
 
-所有阈值、缓存路径、超时、CLI 路径都可在 `skill_discovery` 配置中调整。长文不截断；超过模型上下文时显式失败，不静默删去正文。当前仅保证检查流程执行，不能保证每个候选最终通过探针或教师。此改动不包含全站枚举、职业成功覆盖调度、embedding 索引或已验证的高并发吞吐。
+### 各路之间的重叠
+
+各路之间不做互斥限制。进入 mixed 路的职业同时保留在 occupation 路，同一职业或技能本来就会产出多条任务。两路素材不同，occupation 路只凭职业职责设定情境，mixed 路受召回技能的工作流约束。
+
+skill 路的锚点独立抽样，不排除 mixed 路可能选中的技能。每条任务的 `source_metadata.skill_discovery.selected_ids` 记录实际使用的技能，可在批次结束后统计重叠并在意图层面去重。
+
+deliverable 路用职业的名称、描述和几条典型任务作为检索线索，线索只保存在 `source_metadata`，不进入意图素材。
+
+### 职业筛选表
+
+`config/occupation-filter.csv` 为 1016 个 O*NET 职业给出两个互相独立的标记。
+
+| 标记 | 取值 | 作用 |
+|---|---|---|
+| digitizable | yes、limited、no | 决定职业能否进入管线，occupation、mixed 和 deliverable 的检索线索都受它约束 |
+| mixed_route | yes、no | 决定职业是否生成 mixed 路输入，只反映技能库有无足够相近技能 |
+
+digitizable 依据 O*NET 工作活动重要度。体力、搬运、操控机器、驾驶、维修占主导的记为 no。医疗从业与医疗辅助类中直接照护病人的，以及数字与物理分数接近的，记为 limited。技能少的职业不会因此被剔除，它们保留在 occupation 路。mixed_route 取自 Qwen3-Embedding-8B 向量相似度，一半以上任务有相似度不低于 0.45 的技能记为 yes，另有 4 个经人工复核改为 no。supplemental_search 标出做过补充搜索的 14 个职业，便于单独查看其产出。
+
+当前计数为 yes 459、limited 153、no 404，其中 mixed_route 为 yes 的有 523 个。阈值来自小样本抽查，属于粗筛，最终是否对口由运行时的模型判断决定。默认只取 digitizable 为 yes 的职业。
+
+### 本地技能索引
+
+skill 和 mixed 两路从预先建好的索引取技能，运行时不联网搜索，也不调用 embedding 模型。索引包含技能向量、每个职业的画像与任务向量，以及保存技能正文的 SQLite。编排进程需要 numpy。生成输入时抽取锚点只读 SQLite，不需要 numpy。
+
+当前索引含 117194 条技能，由 SkillMD-138K、huzey/claude-skills、SkillGym 和 ClawHub 补充搜索合并而成，经正文去重、长度与字段过滤、0.97 近重复合并和模板技能移除。其中大部分面向软件开发。约半数技能正文引用了未随正文提供的配套文件，索引以 attachments_missing 标出。索引不进入 Git，放在 `skill_discovery.index_dir` 和 `skill_index_dir` 指向的目录，默认 `data/skill_index`。
+
+```bash
+python3 scripts/export_skill_index.py --skills skills_final.parquet \
+  --skill-vectors skills_final.f16.npy --skill-ids skills_final.ids.json \
+  --query-vectors occ_all.f16.npy --query-ids occ_all.ids.json \
+  --embedding-model Qwen3-Embedding-8B --output data/skill_index
+```
+
+导出脚本需要 numpy 和 pyarrow，输出目录已存在时拒绝覆盖。更换技能池或向量后导出到新目录，并使用新的批次目录。
+
+### skill 路
+
+1. 生成输入时从索引抽取锚点技能。只取正文 200 至 4000 词、有名称和描述、不缺配套文件的技能，按仓库轮流抽取，避免少数大仓库占满。锚点正文直接写入输入。
+2. 运行时取与锚点向量相似度在 `neighbor_min_similarity` 和 `neighbor_max_similarity` 之间的技能作为候选。上限用于排除锚点的变体，候选彼此之间也按同一上限去掉近似版本，避免候选全是同一功能的不同写法。
+3. 模型分析锚点的用途、适用条件、前提和操作，提出工作情境，再判断哪些候选的产出能作为另一技能的输入。没有合适搭配时可以只用锚点。提示词为 `prompts/skills_compose.txt`。
+4. 程序校验锚点在选中技能之内，其余校验与 mixed 路相同。
+
+### mixed 路
+
+1. 取该职业画像和每条任务的向量，各自找出最相近的技能，按查询轮流合并，首轮最多十五条候选。过短、超过 `max_skill_words` 或相似度低于 `min_similarity` 的不进入候选。
+2. 模型读取候选完整正文，先逐条判断是否对口，再固定工作目标、列出三种以上互补能力、选择二至四个技能并给出正文证据、步骤依赖和所需资源。提示词为 `prompts/skills_judge.txt`。
+3. 程序校验证据确实出现在正文、能力全部被覆盖、至少六个不同操作和四层有序依赖、没有不可得的必要资源。
+4. 模型认为候选不足时，追加下一批不重复的候选再判断一次。仍不成立则拒绝该输入，批次继续处理其他任务。
+5. 通过后按原有方式检索一份真实交付物。
+
+两路的 `skill_discovery/` 目录保留输入、每轮候选、模型请求与响应、覆盖检查和接受或拒绝结果。成功检查点可复用，输入、模型、策略或索引变化会要求使用新运行目录。向量召回只负责提名，内容较泛的技能可能在许多职业中排名靠前，是否采用由模型判断。
+
+### deliverable 路
+
+对应论文的交付物驱动合成，用真实交付物作为线索，分析其用途、受众、内容和隐含的制作过程，反推制作、更新、审查或比较此类成果的意图。输入有两种来源。
+
+| 来源 | 生成方式 | 运行时 |
+|---|---|---|
+| 检索线索 | `--deliverable-cases`，每个职业一条 | 用 Responses 原生 web_search 找一份公开成果，下载并解析，最多尝试 `candidate_attempts` 个候选 |
+| 已知 URL | `--deliverable-manifest`，JSON 列表，每项含 url，可选 title 和 publisher | 直接下载并解析，不调用搜索 |
+
+两种来源共用下载完整性检查、容器内正文提取和质量检查。取得的文件成为该任务唯一的意图素材，原文件保留给 03 规划和 04 构建，可以按原有的复用规则作为任务输入。检索线索需要配置 `retrieval.backend` 为 `responses_web_search` 并使用 Responses 接口，缺少时该任务报错。清单中的 URL 须为公开的 HTTPS 地址，下载器不绕过登录或访问限制。交付物目前按任务各自检索，没有跨任务共享缓存和许可证记录。
+
+### 已验证与未验证
+
+本地测试覆盖索引召回、锚点抽样、两种模型判断流程、四路分流、交付物两种来源和候选生成。真实索引的职业召回和邻近技能召回已在开发机实测。两个模型判断环节和 deliverable 路的检索尚未用真实模型运行，判断质量、通过率和交付物可得率未知。

@@ -134,19 +134,23 @@ def download_deliverable(url, folder, image):
     return metadata,text.read_text()
 
 
-def enrich_case(case,folder,config):
+def checkpoint(case,folder):
+    folder=Path(folder);folder.mkdir(parents=True,exist_ok=True)
+    fingerprint=hashlib.sha256(json.dumps(case,sort_keys=True).encode()).hexdigest()
+    cached=folder/'enriched_case.json'
+    if cached.exists():
+        if json.loads((folder/'input_hash.json').read_text())['sha256']!=fingerprint:raise ValueError('Source input changed; choose a new batch')
+        return folder,cached,json.loads(cached.read_text())
+    save(folder/'input_hash.json',{'sha256':fingerprint})
+    return folder,cached,None
+
+
+def find_deliverable(sources,folder,config,focus='the occupation and skills below'):
+    """Search, download and parse one real deliverable; every rejected candidate is retained."""
     policy=config['_POLICY'];settings=policy.get('retrieval',{})
     if settings.get('backend')!='responses_web_search':raise ValueError('Configure the authorized Responses web search backend')
     if config.get('OPENAI_API_MODE')!='responses':raise ValueError('Native web retrieval requires Responses mode')
-    folder=Path(folder);folder.mkdir(parents=True,exist_ok=True)
-    cached=folder/'enriched_case.json'
-    fingerprint=hashlib.sha256(json.dumps(case,sort_keys=True).encode()).hexdigest()
-    if cached.exists():
-        if json.loads((folder/'input_hash.json').read_text())['sha256']!=fingerprint:raise ValueError('Source input changed; choose a new batch')
-        return json.loads(cached.read_text())
-    save(folder/'input_hash.json',{'sha256':fingerprint})
-    sources=case['source_materials']
-    query=('Search the internet for official professional context and ONE existing real professional deliverable closely related to the occupation and skills below. '
+    query=('Search the internet for official professional context and ONE existing real professional deliverable closely related to '+focus+'. '
            'The artifact should be a completed public report, communication plan, training plan, assessment, or equivalent actual work product, preferably a directly downloadable PDF on its original government, university or organization website. '
            'Inspect real sources, do not invent URLs or claim to have downloaded files. Avoid login, paid files, generic templates and software docs. '
            'Return only JSON with string keys professional_context, deliverable_title, deliverable_url, publisher, why_relevant. '
@@ -175,16 +179,50 @@ def enrich_case(case,folder,config):
             continue
         save(folder/'research.json',research)
         save(folder/'selected_candidate.json',{'directory':str(candidate),'earlier_rejections':failures})
-        break
-    else:raise RuntimeError('No readable real deliverable after candidate validation '+json.dumps(failures,ensure_ascii=False))
-    source_id='real-deliverable-'+metadata['sha256'][:16]
+        return research,metadata,body,candidate,urls
+    raise RuntimeError('No readable real deliverable after candidate validation '+json.dumps(failures,ensure_ascii=False))
+
+
+def deliverable_material(research,metadata,body,candidate,use):
+    return {'source_id':'real-deliverable-'+metadata['sha256'][:16],'provenance':(research.get('publisher') or 'publisher not stated')+'; '+metadata['url'],
+         'title':research.get('deliverable_title') or metadata['url'],'url':metadata['url'],'sha256':metadata['sha256'],
+         'snapshot':str(candidate/'artifact'),**text_metadata(candidate/'artifact.txt',body),'use':use}
+
+
+def deliverable_case(case,folder,config):
+    """Deliverable route: the downloaded artifact becomes the only intent material."""
+    folder,cached,done=checkpoint(case,folder)
+    if done:return done
+    meta=case.get('source_metadata',{})
+    if meta.get('deliverable_url'):
+        candidate=folder/'candidate-01'
+        metadata,body=download_deliverable(meta['deliverable_url'],candidate,config['_POLICY']['sandbox']['image'])
+        research={'deliverable_title':meta.get('deliverable_title',''),'publisher':meta.get('publisher','')};urls=[meta['deliverable_url']]
+        how='listed URL downloaded and parsed'
+    elif meta.get('deliverable_search'):
+        research,metadata,body,candidate,urls=find_deliverable(meta['deliverable_search'],folder,config,'the kind of work described below')
+        how='native web_search candidate downloaded and parsed'
+    else:raise ValueError('Deliverable route needs deliverable_url or deliverable_search')
+    result=json.loads(json.dumps(case))
+    result['source_materials']=[deliverable_material(research,metadata,body,candidate,
+        'Complete extracted text is supplied; the original file remains available to planning and construction. It is a cue for the kind of work, audience and production process. It may be reused or adapted as a task input for update, review or comparison work; do not leak a new task answer.')]
+    result['source_metadata']={**meta,'retrieval_folder':str(folder),'web_source_urls':urls,'deliverable_acquisition':how}
+    result['constraints']['external_retrieval']=False
+    result['constraints']['retrieval_scope']='Source preparation completed and frozen; solver uses supplied files only.'
+    save(cached,result)
+    return result
+
+
+def enrich_case(case,folder,config):
+    """Mixed route: add web context and a real deliverable to occupation and skill materials."""
+    folder,cached,done=checkpoint(case,folder)
+    if done:return done
+    research,metadata,body,candidate,urls=find_deliverable(case['source_materials'],folder,config)
     result=json.loads(json.dumps(case))
     result['source_materials']+=[{'source_id':'web-context-'+case['task_id'],'provenance':'GPT native web_search with saved response and source URLs',
         'content':research['professional_context'],'urls':urls},
-        {'source_id':source_id,'provenance':research['publisher']+'; '+metadata['url'],
-         'title':research['deliverable_title'],'url':metadata['url'],'sha256':metadata['sha256'],
-         'snapshot':str(candidate/'artifact'),**text_metadata(candidate/'artifact.txt',body),
-         'use':'Complete extracted text is supplied; original file remains available. Prefer task-appropriate reuse, then adapt, then synthesize missing inputs. Prior deliverables may support review, update or comparison; do not leak the new task answer.'}]
+        deliverable_material(research,metadata,body,candidate,
+         'Complete extracted text is supplied; original file remains available. Prefer task-appropriate reuse, then adapt, then synthesize missing inputs. Prior deliverables may support review, update or comparison; do not leak the new task answer.')]
     result['source_metadata']={**result.get('source_metadata',{}),'mixed_inputs':['occupation','skills','web_context','real_deliverable'],
                                'retrieval_folder':str(folder),'web_source_urls':urls}
     result['constraints']['scope']=result['constraints'].get('scope','').replace('Do not claim web retrieval.','')

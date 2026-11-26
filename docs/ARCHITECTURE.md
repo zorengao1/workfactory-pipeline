@@ -14,9 +14,10 @@
 
 | 模块 | 输入 | 输出与职责 |
 |---|---|---|
-| sources/source_pools.py | 来源配置与官方资料 | 可追溯的职业、技能候选输入 |
-| sources/skills_discovery.py | 工作目标与已有素材 | 在线技能搜索、正文筛选、覆盖审核与补搜记录 |
-| sources/source_retrieval.py | 职业目标与检索配置 | 真实交付物、正文和来源目录 |
+| sources/source_pools.py | 来源配置、官方资料与职业筛选表 | 按四路标明路线的候选输入 |
+| sources/skill_index.py | 本地技能索引、职业代码或锚点技能 | 锚点抽样、向量召回的候选技能及正文 |
+| sources/skills_discovery.py | skill 与 mixed 路输入、候选技能 | 模型判断、技能组合、覆盖校验与审计记录 |
+| sources/source_retrieval.py | 检索线索、已知 URL 或职业素材 | deliverable 与 mixed 路的真实交付物、正文和来源目录 |
 | sources/download_transport.py | 下载 URL | 带完整性检查和重试的下载文件 |
 | sources/pdf_extraction.py | PDF 原文件 | 原生正文或 OCR 正文 |
 | sources/source_artifacts.py | 原文件目录与构建计划 | 全文读取、文件复用与一致性检查 |

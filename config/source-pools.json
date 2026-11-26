@@ -4,15 +4,11 @@
   "occupation_limit": 0,
   "skill_case_count": 24,
   "sampling_seed": 42,
-  "skills_cli_version": "1.8.1",
-  "skills_repositories": [
-    "anthropics/skills",
-    "anthropics/knowledge-work-plugins",
-    "anthropics/financial-services",
-    "anthropics/claude-for-legal",
-    "anthropics/healthcare",
-    "anthropics/life-sciences",
-    "anthropics/k12-teacher-skills",
-    "k-dense-ai/scientific-agent-skills"
-  ]
+  "occupation_filter": "config/occupation-filter.csv",
+  "digitizable_levels": [
+    "yes"
+  ],
+  "mixed_case_count": -1,
+  "skill_index_dir": "data/skill_index",
+  "deliverable_case_count": -1
 }

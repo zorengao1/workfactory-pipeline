@@ -31,7 +31,8 @@ def source_cases(policy):
         ids.add(case['task_id'])
         if case['stage'] not in ('01a_occupation','01b_skill','01c_deliverable'):
             raise ValueError('Unknown source route')
-        if not case.get('source_materials'):
+        pending = case.get('source_metadata', {})
+        if not case.get('source_materials') and not (case['stage'] == '01c_deliverable' and (pending.get('deliverable_search') or pending.get('deliverable_url'))):
             raise ValueError('Source materials and provenance are required')
         constraints = {
             'allowed_reference_formats':policy['allowed_reference_formats'],

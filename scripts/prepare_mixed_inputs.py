@@ -1,4 +1,4 @@
-"""Prepare occupation-anchored cases through online skills CLI and model review."""
+"""Preview mixed-route skill recall and model judgement for chosen occupations."""
 import argparse
 import json
 import sys
@@ -29,6 +29,7 @@ def main():
             raise ValueError('Unknown or duplicate occupation ' + code)
         case = matches[0]
         case['task_id'] = 'mixed-' + code.replace('.', '-')
+        case['source_metadata']['route'] = 'mixed'
         try:
             results.append(enrich_skills(case, args.audit/case['task_id'], stage_config(config, case['stage'])))
         except DiscoveryRejected as exc:
